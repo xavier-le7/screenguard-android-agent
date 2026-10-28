@@ -1,0 +1,25 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+.idea/
+*.iml
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+# Never commit secrets, keys or signing credentials
+*.jks
+*.keystore
+*.pem
+*.p12
+.env
+
+# APK signing files must stay out of Git
+*.p12
+*.pfx
+*.jks
+*keystore*base64*.txt
+signing-password.txt
