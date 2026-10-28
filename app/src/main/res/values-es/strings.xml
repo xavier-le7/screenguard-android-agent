@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sg_293feec7" formatted="false">PROTECCIÓN</string>
+    <string name="sg_449bc01b" formatted="false">TIEMPO COMPARTIDO RESTANTE</string>
+    <string name="sg_70b5309e" formatted="false">El mismo límite en todos los dispositivos</string>
+    <string name="sg_72eb9f3a" formatted="false">TABLETA HOY</string>
+    <string name="sg_a139f0f9" formatted="false">ÚLTIMA SINCRONIZACIÓN</string>
+    <string name="sg_2310ce6c" formatted="false">Estado del sistema</string>
+    <string name="sg_d97c51cc" formatted="false">Servidor</string>
+    <string name="sg_bf1abd16" formatted="false">Seguimiento del tiempo</string>
+    <string name="sg_ae8a7c30" formatted="false">Bloqueo de aplicaciones</string>
+    <string name="sg_280d705a" formatted="false">Ajustes protegidos</string>
+    <string name="sg_a2d2a4d6" formatted="false">Configuración</string>
+    <string name="sg_9f84fb99" formatted="false">Vinculación y permisos</string>
+    <string name="sg_a10f45cc" formatted="false">SERVIDOR</string>
+    <string name="sg_8d2c323c" formatted="false">PERFIL</string>
+    <string name="sg_3390491f" formatted="false">Solicitar código de vinculación</string>
+    <string name="sg_885a9b02" formatted="false">Tableta ya vinculada.</string>
+    <string name="sg_daf7e711" formatted="false">Permitir estadísticas de uso</string>
+    <string name="sg_a08c7a9d" formatted="false">Activar accesibilidad</string>
+    <string name="sg_24d637a5" formatted="false">Iniciar / reanudar seguimiento</string>
+    <string name="sg_f397ee01" formatted="false">Activar restricciones</string>
+    <string name="sg_bd2dd168" formatted="false">Vincula primero esta tableta.</string>
+    <string name="sg_d7f78883" formatted="false">Permite las estadísticas e inicia el seguimiento.</string>
+    <string name="sg_de86950d" formatted="false">Activa ScreenGuard en Accesibilidad.</string>
+    <string name="sg_b7e78cdb" formatted="false">Protección activada: se aplican los límites.</string>
+    <string name="sg_6849ad85" formatted="false">PROTECCIÓN DE AJUSTES</string>
+    <string name="sg_1a887fe5" formatted="false">Wi-Fi, Bluetooth, sonido y pantalla siguen disponibles. </string>
+    <string name="sg_5916f053" formatted="false">Puedes instalar o desinstalar otras aplicaciones libremente. </string>
+    <string name="sg_95d93fca" formatted="false">Los ajustes que pueden desactivar ScreenGuard requieren el PIN parental.</string>
+    <string name="sg_a337160e" formatted="false">Proteger ajustes sensibles</string>
+    <string name="sg_9a1d98e6" formatted="false">Controles parentales</string>
+    <string name="sg_e2737b08" formatted="false">Pruebas y acciones protegidas</string>
+    <string name="sg_afd566e5" formatted="false">El PIN parental protege estas acciones. La prueba local no cambia el límite.</string>
+    <string name="sg_4a6bed03" formatted="false">Probar el bloqueo durante 60 segundos</string>
+    <string name="sg_164da51d" formatted="false">Establecer / cambiar PIN parental</string>
+    <string name="sg_5fd8d1c5" formatted="false">Permitir ajustes sensibles (15 min)</string>
+    <string name="sg_b222821b" formatted="false">Desactivar protección de ajustes</string>
+    <string name="sg_f0d632e7" formatted="false">Quitar administrador del dispositivo</string>
+    <string name="sg_1207bc7e" formatted="false">Cancelar prueba</string>
+    <string name="sg_bdd17bcf" formatted="false">Desactivar restricciones</string>
+    <string name="sg_5d3cd03b" formatted="false">Detener seguimiento</string>
+    <string name="sg_89c95e01" formatted="false">Diagnóstico avanzado</string>
+    <string name="sg_39c8c758" formatted="false">Servicios y marcas de tiempo</string>
+    <string name="sg_0865b800" formatted="false">Copiar diagnóstico</string>
+    <string name="sg_d833b0a8" formatted="false">Protección incompleta</string>
+    <string name="sg_5e765e62" formatted="false">Configuración necesaria</string>
+    <string name="sg_50c4ee19" formatted="false">Tiempo de pantalla agotado</string>
+    <string name="sg_64fee967" formatted="false">Límite de tiempo activo</string>
+    <string name="sg_2d0d0321" formatted="false">Revisar protección</string>
+    <string name="sg_77e0e2a5" formatted="false">Protección local activa</string>
+    <string name="sg_4a6fe425" formatted="false">Esperando límite de tiempo</string>
+    <string name="sg_e835d60d" formatted="false">Protección activa</string>
+    <string name="sg_82463a0d" formatted="false">Vuelve a activar el administrador en ScreenGuard.</string>
+    <string name="sg_7c86c01f" formatted="false">Vincula la tableta a un perfil ScreenGuard.</string>
+    <string name="sg_a7c69dcd" formatted="false">Las aplicaciones de ocio están bloqueadas.</string>
+    <string name="sg_61ffef76" formatted="false">La protección de ajustes sensibles no está activada.</string>
+    <string name="sg_f62c5a18" formatted="false">Hay que reactivar un permiso o servicio.</string>
+    <string name="sg_71639452" formatted="false">Sin conexión: se aplica el último límite conocido.</string>
+    <string name="sg_343a8518" formatted="false">El servidor aún no confirmó el límite de hoy.</string>
+    <string name="sg_abc3e5c5" formatted="false">El límite compartido y las restricciones están activos.</string>
+    <string name="sg_9b29266b" formatted="false">Límite agotado u horario finalizado</string>
+    <string name="sg_d5a11af7" formatted="false">Queda poco tiempo permitido</string>
+    <string name="sg_12427239" formatted="false">Tiempo restante en los dispositivos</string>
+    <string name="sg_07232347" formatted="false">Límite de hoy no disponible</string>
+    <string name="sg_b9ad8b6f" formatted="false">Vincula la tableta al perfil infantil.</string>
+    <string name="sg_a353094a" formatted="false">● Servidor activo</string>
+    <string name="sg_c2e6a03a" formatted="false">● Sin conexión</string>
+    <string name="sg_e7de9ea8" formatted="false">● Admin inactivo</string>
+    <string name="sg_9e1cdb51" formatted="false">● Bloqueado</string>
+    <string name="sg_1455e1d3" formatted="false">● Protegido</string>
+    <string name="sg_119b2eab" formatted="false">● Revisar</string>
+    <string name="sg_8efedc90" formatted="false">● Conectado</string>
+    <string name="sg_1b61d21c" formatted="false">● Falta permiso</string>
+    <string name="sg_47181b7e" formatted="false">● Activo</string>
+    <string name="sg_531b9f0a" formatted="false">● Suspendido</string>
+    <string name="sg_58ac03e7" formatted="false">● Desactivado</string>
+    <string name="sg_728e044e" formatted="false">● Servicio inactivo</string>
+    <string name="sg_7346703f" formatted="false">● Bloqueo activo</string>
+    <string name="sg_9beb571b" formatted="false">● Activado</string>
+    <string name="sg_758a2498" formatted="false">● PIN no definido</string>
+    <string name="sg_24e6934e" formatted="false">● No activado</string>
+    <string name="sg_79791561" formatted="false">● Admin quitado</string>
+    <string name="sg_3c4a261e" formatted="false">● Accesibilidad inactiva</string>
+    <string name="sg_6b9eebc1" formatted="false">● Padre autorizado</string>
+    <string name="sg_c639d43b" formatted="false">● Protección activada</string>
+    <string name="sg_507c1e38" formatted="false">✓ Estadísticas autorizadas</string>
+    <string name="sg_758fada9" formatted="false">1 · Permitir estadísticas</string>
+    <string name="sg_d095385a" formatted="false">✓ Accesibilidad activada</string>
+    <string name="sg_00656586" formatted="false">2 · Activar accesibilidad</string>
+    <string name="sg_2c0db71c" formatted="false">✓ Seguimiento activo</string>
+    <string name="sg_44d5420f" formatted="false">3 · Iniciar / reanudar</string>
+    <string name="sg_51f03224" formatted="false">✓ Restricciones activadas</string>
+    <string name="sg_e09390b6" formatted="false">4 · Activar restricciones</string>
+    <string name="sg_2861bed2" formatted="false">⚠ Reactivar administrador</string>
+    <string name="sg_c6ed4729" formatted="false">Configura un PIN parental antes de activar</string>
+    <string name="sg_3e90df28" formatted="false">✓ Ajustes sensibles protegidos</string>
+    <string name="sg_bb39f797" formatted="false">Activar protección de ajustes</string>
+    <string name="sg_3bd532e8" formatted="false">Activar protección contra desinstalación</string>
+    <string name="sg_caa37aed" formatted="false">¿Quitar protección contra desinstalación?</string>
+    <string name="sg_ed28f491" formatted="false">ScreenGuard podrá desinstalarse desde Android.</string>
+    <string name="sg_aab05382" formatted="false">El administrador fue quitado por el padre.</string>
+    <string name="sg_1ad40698" formatted="false">PIN parental creado; protección opcional disponible.</string>
+    <string name="sg_694e4ea0" formatted="false">Crea primero un PIN parental.</string>
+    <string name="sg_6e771ab8" formatted="false">Ajustes sensibles permitidos durante 15 minutos.</string>
+    <string name="sg_6d8c399a" formatted="false">PIN parental no configurado.</string>
+    <string name="sg_c1a23640" formatted="false">Protección de ajustes desactivada. Administrador activo.</string>
+    <string name="sg_f9e1052f" formatted="false">Prueba cancelada.</string>
+    <string name="sg_efa25532" formatted="false">Restricciones desactivadas; seguimiento activo.</string>
+    <string name="sg_0149b19a" formatted="false">¿Detener seguimiento?</string>
+    <string name="sg_84da47cb" formatted="false">El seguimiento y el bloqueo se detendrán.</string>
+    <string name="sg_37b018b8" formatted="false">Detener</string>
+    <string name="sg_e7d06678" formatted="false">Seguimiento detenido por el padre.</string>
+    <string name="sg_c0d44ad6" formatted="false">Diagnóstico copiado sin token ni PIN parental.</string>
+    <string name="sg_3017b05d" formatted="false">Configura tu PIN en Controles parentales.</string>
+    <string name="sg_851df924" formatted="false">Activa accesibilidad antes de esta protección.</string>
+    <string name="sg_1b366f96" formatted="false">Ajustes ScreenGuard protegidos. Wi-Fi y otras apps libres.</string>
+    <string name="sg_49bb52ff" formatted="false">Protección activada. Wi-Fi y otras apps disponibles.</string>
+    <string name="sg_a142d0c8" formatted="false">Administrador no activado: no se añadió filtro.</string>
+    <string name="sg_373552f5" formatted="false">Permite las estadísticas de uso.</string>
+    <string name="sg_fb11740f" formatted="false">Seguimiento solicitado; sincronización automática activa.</string>
+    <string name="sg_40cbc244" formatted="false">Activa primero las restricciones.</string>
+    <string name="sg_c52a7cfd" formatted="false">Activa el servicio de accesibilidad.</string>
+    <string name="sg_dbb7b0d4" formatted="false">El servicio de accesibilidad no responde.</string>
+    <string name="sg_4c043db6" formatted="false">Inicia primero el seguimiento permanente.</string>
+    <string name="sg_6860fa0e" formatted="false">El seguimiento está suspendido.</string>
+    <string name="sg_ee27f666" formatted="false">Prueba no disponible</string>
+    <string name="sg_7c27acbb" formatted="false">Bloqueo activado durante 60 segundos</string>
+    <string name="sg_315a86fe" formatted="false">Abre un juego para ver el bloqueo. </string>
+    <string name="sg_73b9be0d" formatted="false">Las aplicaciones esenciales siguen disponibles. </string>
+    <string name="sg_95f7cc47" formatted="false">El límite del servidor no cambia.</string>
+    <string name="sg_13b01990" formatted="false">Permanecer aquí</string>
+    <string name="sg_c19727a7" formatted="false">Ir al inicio</string>
+    <string name="sg_56155457" formatted="false">Prueba local activada durante 60 segundos.</string>
+    <string name="sg_4d1b1692" formatted="false">PIN parental · 6 dígitos</string>
+    <string name="sg_f1b268c5" formatted="false">No hay PIN parental. Activa primero las restricciones.</string>
+    <string name="sg_39f5116d" formatted="false">PIN parental actual</string>
+    <string name="sg_df6e98a5" formatted="false">Nuevo PIN (6 dígitos)</string>
+    <string name="sg_666a48ea" formatted="false">Confirmar nuevo PIN</string>
+    <string name="sg_c6ec2e5f" formatted="false">Cambiar PIN parental</string>
+    <string name="sg_8080ef38" formatted="false">Se requiere el PIN actual. Las restricciones siguen activas.</string>
+    <string name="sg_caeefe53" formatted="false">El nuevo PIN debe tener 6 dígitos.</string>
+    <string name="sg_d41fea99" formatted="false">Los PIN no coinciden.</string>
+    <string name="sg_af4cf876" formatted="false">Elige un PIN nuevo distinto.</string>
+    <string name="sg_99f5e219" formatted="false">PIN parental cambiado. El nuevo PIN está activo.</string>
+    <string name="sg_e08ccdda" formatted="false">PIN actual incorrecto o bloqueado temporalmente.</string>
+    <string name="sg_8e987661" formatted="false">Confirmar PIN</string>
+    <string name="sg_c12d16ef" formatted="false">Crear PIN parental</string>
+    <string name="sg_3ba5d874" formatted="false">Elige seis dígitos distintos del PIN Android del niño. </string>
+    <string name="sg_bf1da24a" formatted="false">Se pedirá este PIN para detener la protección.</string>
+    <string name="sg_288bf9b8" formatted="false">Ambos PIN deben coincidir (seis dígitos).</string>
+    <string name="sg_8c7c30b8" formatted="false">Autorización parental</string>
+    <string name="sg_2b37f85f" formatted="false">Introduce el PIN de ScreenGuard.</string>
+    <string name="sg_438af06a" formatted="false">PIN incorrecto o bloqueado temporalmente.</string>
+    <string name="sg_3c1a9123" formatted="false">Vinculación aceptada. Configura ahora los permisos.</string>
+    <string name="sg_ee8649a6" formatted="false">Ajustes de idioma no disponibles.</string>
+    <string name="sg_31245698" formatted="false">Idioma de la aplicación</string>
+    <string name="sg_306f0ac5" formatted="false">Cancelar</string>
+    <string name="sg_a4ac8b97" formatted="false">Quitar</string>
+    <string name="sg_1ddc9ec0" formatted="false">Guardar</string>
+    <string name="sg_71012589" formatted="false">Confirmar</string>
+    <string name="sg_83d08b95" formatted="false">Nunca</string>
+    <string name="sg_ba6b9f75" formatted="false">nunca</string>
+    <string name="sg_a6255d06" formatted="false">ahora mismo</string>
+    <string name="sg_6cb425c3" formatted="false">hace </string>
+    <string name="sg_39b0c880" formatted="false">Sin conexión · </string>
+    <string name="sg_adbe59a7" formatted="false">Ajuste protegido</string>
+    <string name="sg_b2d78d57" formatted="false">Este ajuste puede modificar la protección ScreenGuard. </string>
+    <string name="sg_6cdec245" formatted="false">El PIN parental desbloquea los ajustes sensibles durante 15 minutos.</string>
+    <string name="sg_d3533e7e" formatted="false">PIN parental (6 dígitos)</string>
+    <string name="sg_d0919be7" formatted="false">Desbloquear 15 minutos</string>
+    <string name="sg_89b4ffa5" formatted="false">Protección de ajustes desactivada</string>
+    <string name="sg_862ef0a4" formatted="false">Falta PIN parental: filtro inactivo</string>
+    <string name="sg_18483211" formatted="false">Autorización parental de 15 minutos aún activa</string>
+    <string name="sg_45064480" formatted="false">Pantalla de ajustes sensibles detectada</string>
+    <string name="sg_1ad0d24e" formatted="false">Pantalla Samsung no reconocida como sensible</string>
+    <string name="sg_e7b256b5" formatted="false">Ajustes sensibles protegidos</string>
+    <string name="sg_07911ee4" formatted="false">Restricciones no activadas</string>
+    <string name="sg_3c654392" formatted="false">Seguimiento desactivado</string>
+    <string name="sg_0c6cd872" formatted="false">Acceso a estadísticas denegado</string>
+    <string name="sg_694267f0" formatted="false">Pantalla apagada</string>
+    <string name="sg_5d2270a7" formatted="false">Tableta bloqueada</string>
+    <string name="sg_cd3ecbb9" formatted="false">Contador no disponible; revisa el seguimiento</string>
+    <string name="sg_2e5484dd" formatted="false">No se detectó la aplicación activa</string>
+    <string name="sg_7180800b" formatted="false">PRUEBA: aplicación excluida</string>
+    <string name="sg_cc031c68" formatted="false">Las aplicaciones permanecerán bloqueadas hasta su autorización.</string>
+    <string name="sg_b7f5a4d6" formatted="false"> se han agotado. </string>
+    <string name="sg_48329564" formatted="false">Volver al inicio</string>
+    <string name="sg_b8a9e76a" formatted="false">Protección de ajustes no disponible: </string>
+    <string name="sg_a211e0f4" formatted="false">No se puede mostrar el bloqueo: </string>
+    <string name="sg_2f332eae" formatted="false">Servicio de accesibilidad detenido</string>
+    <string name="sg_050f5a22" formatted="false">Reactivación: seguimiento no disponible</string>
+    <string name="sg_0007bf48" formatted="false">Seguimiento no disponible: revisa el permiso.</string>
+    <string name="sg_db52e749" formatted="false">Se necesita vinculación y acceso a estadísticas.</string>
+    <string name="sg_133e2cdb" formatted="false">Seguimiento iniciado. Conectando al servidor...</string>
+    <string name="sg_affc9734" formatted="false">Servidor activo — límite recibido.</string>
+    <string name="sg_7c357c15" formatted="false">El servidor solicitó bloqueo inmediato.</string>
+    <string name="sg_c1840980" formatted="false">Avisos ScreenGuard</string>
+    <string name="sg_be1d1fb9" formatted="false">Tiempo agotado: aplicaciones restringidas.</string>
+    <string name="sg_e2e9c292" formatted="false">Monitorización ScreenGuard</string>
+    <string name="sg_0cf5726b" formatted="false">Seguimiento del tiempo y sincronización de límites.</string>
+    <string name="sg_5a7feee6" formatted="false">ScreenGuard — seguimiento activo</string>
+    <string name="sg_9b89a622" formatted="false">El tiempo de uso se registra y sincroniza.</string>
+    <string name="sg_f7a30987" formatted="false">Vinculación aceptada; activa el seguimiento.</string>
+    <string name="sg_2571f42b" formatted="false">Vinculación caducada: solicita otro código.</string>
+    <string name="sg_7ffa790d" formatted="false">Sin token válido: vincula esta tableta.</string>
+    <string name="sg_2335e7f6" formatted="false">Servidor conectado — sincronización activa.</string>
+    <string name="sg_bae232dc" formatted="false">Servidor sin respuesta: reconectando.</string>
+    <string name="sg_1311ddde" formatted="false">El servidor desvinculó el agente.</string>
+    <string name="sg_e853d3ab" formatted="false">Sin conexión — uso guardado localmente.</string>
+    <string name="sg_be816626" formatted="false">Conexión perdida — reconexión automática.</string>
+    <string name="sg_55767c83" formatted="false">Dirección inválida: usa wss://host/ws.</string>
+    <string name="sg_873ac91e" formatted="false">Idioma</string>
+    <string name="sg_04c8671a" formatted="false">Seguimiento</string>
+    <string name="sg_49e065dd" formatted="false">Cancelación</string>
+    <string name="sg_c1a92b96" formatted="false">Tableta de </string>
+    <string name="sg_394ded49" formatted="false">✓ Dispositivo vinculado al perfil </string>
+    <string name="sg_613f065f" formatted="false">. No es necesario volver a vincular.</string>
+    <string name="sg_3b83e76a" formatted="false">Perfil: </string>
+    <string name="sg_fb7a7ad0" formatted="false">Vinculación: </string>
+    <string name="sg_0a3349fa" formatted="false">Servidor: </string>
+    <string name="sg_2b74b8c4" formatted="false">Respuesta del límite: </string>
+    <string name="sg_52163ef7" formatted="false">Servicio de seguimiento: </string>
+    <string name="sg_373af380" formatted="false">Última muestra: </string>
+    <string name="sg_3477f3ed" formatted="false">Acceso a estadísticas: </string>
+    <string name="sg_6aabc0e8" formatted="false">Accesibilidad: </string>
+    <string name="sg_7a173af3" formatted="false">Servicio de accesibilidad: </string>
+    <string name="sg_01597add" formatted="false">Última evaluación: </string>
+    <string name="sg_e4b4cb9f" formatted="false">Restricciones: </string>
+    <string name="sg_8ae9617f" formatted="false">Administrador Android: </string>
+    <string name="sg_def8eb4a" formatted="false">Filtro de ajustes sensibles: </string>
+    <string name="sg_8f9df593" formatted="false">Última comprobación de ajustes: </string>
+    <string name="sg_e88019db" formatted="false">Comprobación de ajustes: </string>
+    <string name="sg_fcfff420" formatted="false">Acceso temporal a ajustes: </string>
+    <string name="sg_5251edc6" formatted="false">Decisión: </string>
+    <string name="sg_d9f0b3a9" formatted="false">Prueba local: </string>
+    <string name="sg_c2feb808" formatted="false">Seguimiento de respaldo: </string>
+    <string name="sg_778d8416" formatted="false">Aplicación: </string>
+    <string name="sg_763a59ad" formatted="false">Bloqueador: </string>
+    <string name="sg_7bc02471" formatted="false">Estado: </string>
+    <string name="sg_120a89ff" formatted="false">Mensaje: </string>
+    <string name="sg_5f099327" formatted="false">No se puede cambiar el PIN: </string>
+    <string name="sg_4c0e9809" formatted="false">PIN parental: </string>
+    <string name="sg_f5f7b847" formatted="false">Acción no disponible: </string>
+    <string name="sg_adf6cffd" formatted="false">Límite recibido: </string>
+    <string name="sg_797fff15" formatted="false">Aplicación protegida: </string>
+    <string name="sg_23b751ef" formatted="false">PRUEBA: bloqueo solicitado para </string>
+    <string name="sg_a06bf0b6" formatted="false">Límite agotado: bloqueando </string>
+    <string name="sg_0d05e1e8" formatted="false">Tiempo permitido para </string>
+    <string name="sg_e17671ac" formatted="false">El límite o horario del perfil </string>
+    <string name="sg_e3bcfc14" formatted="false">Administrador ScreenGuard inactivo: puede desinstalarse</string>
+    <string name="sg_8952015f" formatted="false">Acceso a estadísticas revocado: sin seguimiento</string>
+    <string name="sg_6131e756" formatted="false">Accesibilidad ScreenGuard inactiva: bloqueo no garantizado</string>
+    <string name="sg_cd96efee" formatted="false">Seguimiento inactivo: comprueba ScreenGuard Agent</string>
+    <string name="sg_5ee53069" formatted="false">Estado de protección ScreenGuard</string>
+    <string name="sg_930713eb" formatted="false">ScreenGuard — atención</string>
+    <string name="sg_e10d1b51" formatted="false">Desactivar el administrador de ScreenGuard reduce la protección. </string>
+    <string name="sg_002112fe" formatted="false">Para cambiarlo, utiliza los controles parentales de ScreenGuard.</string>
+    <string name="sg_ad97a27c" formatted="false">Administrador desactivado: puede desinstalarse.</string>
+    <string name="sg_ba6ceb28" formatted="false"> minuto(s) de tiempo permitido.</string>
+    <string name="sg_6fef7c37" formatted="false">Quedan aproximadamente </string>
+    <string name="sg_ab81aded" formatted="false">Seguimiento local no disponible: </string>
+    <string name="sg_40424486" formatted="false">Estadísticas no disponibles: </string>
+    <string name="sg_b8fb52a1" formatted="false">Red: callback no disponible (</string>
+    <string name="sg_9c5d7255" formatted="false">Servidor activo — decisión: </string>
+    <string name="sg_3c382cff" formatted="false">Introduce este código en ScreenGuard: </string>
+    <string name="sg_04c90472" formatted="false">Vinculación solicitada. Introduce en ScreenGuard: </string>
+    <string name="sg_bd05d296" formatted="false">Error de vinculación: </string>
+    <string name="sg_ac7d66a7" formatted="false">No se pudo vincular: </string>
+    <string name="sg_abd9a3ff" formatted="false">Sincronización: </string>
+    <string name="sg_080671fb" formatted="false">Conectado: límite no disponible para UID </string>
+    <string name="sg_f8a9b526" formatted="false">Mensaje del padre: </string>
+    <string name="sg_9204f39c" formatted="false">Mensaje desconocido: </string>
+    <string name="sg_b9d37e29" formatted="false">autorizado</string>
+    <string name="sg_73a90b2a" formatted="false">inactivo</string>
+    <string name="sg_72b3d739" formatted="false">AUSENTE</string>
+    <string name="sg_4db3c63c" formatted="false">NO CONFIRMADO</string>
+    <string name="sg_0c80953f" formatted="false">CONECTADO</string>
+    <string name="sg_c6cab633" formatted="false">Comprobando…</string>
+    <string name="sg_10f25ab2" formatted="false">ScreenGuard - autorización parental</string>
+    <string name="guard_accessibility_description">ScreenGuard aplica los límites de tiempo y horarios del perfil infantil. Solo detecta la aplicación activa y no registra el contenido de la pantalla. Inicio, llamadas y emergencias permanecen accesibles. Los ajustes sensibles pueden protegerse con un PIN parental.</string>
+    <string name="device_admin_explanation">ScreenGuard utiliza el administrador del dispositivo solo para añadir un paso antes de desinstalar. No solicita borrar datos, bloquear ni cambiar la contraseña de Android.</string>
+    <string name="sg_22c44a47" formatted="false">Mensajes de los padres</string>
+    <string name="sg_2a5e62e3" formatted="false">Mensajes enviados desde la aplicación para padres ScreenGuard.</string>
+    <string name="sg_69373299" formatted="false">Nuevo mensaje de los padres</string>
+    <string name="sg_9b759620" formatted="false">Mensaje de los padres</string>
+    <string name="sg_7d37f987" formatted="false">Cerrar</string>
+    <string name="sg_e66a3d1c" formatted="false">Permitir notificaciones</string>
+    <string name="sg_bdba41ef" formatted="false">✓ Notificaciones permitidas</string>
+    <string name="sg_7a79255b" formatted="false">Las notificaciones son necesarias para mostrar mensajes de los padres.</string>
+    <string name="sg_8ece7ff3" formatted="false">Nombre del perfil infantil</string>
+    <string name="sg_d47abdb0" formatted="false">Introduce un nombre de perfil.</string>
+</resources>

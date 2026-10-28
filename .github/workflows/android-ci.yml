@@ -1,0 +1,272 @@
+name: Android CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Untrusted pull requests run without access to signing secrets.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Source privacy preflight
+        run: python3 scripts/check-public-snapshot.py
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android API 35
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | head -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Android sdkmanager introuvable" >&2
+            exit 1
+          fi
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Unit tests and debug compilation
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+
+  # Public pull requests and main pushes never receive signing secrets.
+  signed-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify release tag belongs to main
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Only mainline commits may be signed and released."
+            exit 1
+          fi
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android API 35
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | head -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Android sdkmanager introuvable" >&2
+            exit 1
+          fi
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      # Do not publish runner-generated debug keys. They change between runs
+      # and Android rejects upgrades with mismatched signing certificates.
+      - name: Restore stable signing key
+        env:
+          SIGNING_KEYSTORE_B64: ${{ secrets.SG_ANDROID_KEYSTORE_B64 }}
+          SIGNING_PASSWORD: ${{ secrets.SG_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_B64" ] || [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::error::Configure SG_ANDROID_KEYSTORE_B64 and SG_ANDROID_KEYSTORE_PASSWORD in repository Actions secrets (see docs/SIGNING.md)."
+            exit 1
+          fi
+          # GitHub secrets copied from a terminal may include line breaks,
+          # spaces or terminal CRLF. Remove whitespace without echoing the key.
+          umask 077
+          python3 - <<'PY'
+          import base64
+          import binascii
+          import os
+          from pathlib import Path
+
+          raw = os.environ["SIGNING_KEYSTORE_B64"]
+          sanitized = "".join(raw.split())
+          try:
+              binary = base64.b64decode(sanitized, validate=True)
+          except (binascii.Error, ValueError):
+              raise SystemExit(
+                  "::error::SG_ANDROID_KEYSTORE_B64 is present but is not valid base64. "
+                  "Re-copy the contents of signing-keystore-base64.txt; "
+                  "do not paste a path, command, password or surrounding quotes."
+              )
+          if len(binary) < 100:
+              raise SystemExit("::error::Signing keystore too small to be a valid PKCS#12 file.")
+          target = Path(os.environ["RUNNER_TEMP"]) / "screenguard-agent.p12"
+          target.write_bytes(binary)
+          target.chmod(0o600)
+          PY
+          keytool -list -keystore "$RUNNER_TEMP/screenguard-agent.p12" \
+            -storetype PKCS12 -storepass:env SIGNING_PASSWORD -alias screenguard-agent > /dev/null
+      - name: Build signed Android release
+        env:
+          SG_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/screenguard-agent.p12
+          SG_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SG_ANDROID_KEYSTORE_PASSWORD }}
+        run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
+
+      # Existing installations may use a permanently signed debug
+      # APK. Both variants must have the SAME signing certificate and package,
+      # and the release versionCode must increase for in-place upgrades.
+      - name: Verify release signature, identity and non-debuggable flag
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          DEBUG="app/build/outputs/apk/debug/app-debug.apk"
+          RELEASE="app/build/outputs/apk/release/app-release.apk"
+
+          test -s "$DEBUG"
+          test -s "$RELEASE"
+          "$APKSIGNER" verify --verbose --print-certs "$DEBUG" > "$RUNNER_TEMP/debug-signature.txt"
+          "$APKSIGNER" verify --verbose --print-certs "$RELEASE" > "$RUNNER_TEMP/release-signature.txt"
+
+          digest() {
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$1" | head -n 1
+          }
+          DEBUG_DIGEST="$(digest "$RUNNER_TEMP/debug-signature.txt")"
+          RELEASE_DIGEST="$(digest "$RUNNER_TEMP/release-signature.txt")"
+          if [ -z "$DEBUG_DIGEST" ] || [ "$DEBUG_DIGEST" != "$RELEASE_DIGEST" ]; then
+            echo "::error::Signing certificate differs from installed stable-debug variants."
+            exit 1
+          fi
+
+          DEBUG_PACKAGE="$("$AAPT" dump badging "$DEBUG" | grep '^package:' | head -n 1)"
+          RELEASE_PACKAGE="$("$AAPT" dump badging "$RELEASE" | grep '^package:' | head -n 1)"
+          for package in "$DEBUG_PACKAGE" "$RELEASE_PACKAGE"; do
+            case "$package" in
+              *"name='fr.sevenskies.screenguard.agent'"*) ;;
+              *) echo "::error::Unexpected Android application ID."; exit 1 ;;
+            esac
+          done
+          # Require monotonically increasing versions, not a hard-coded
+          # versionCode that would prevent future releases.
+          DEBUG_CODE="$(printf '%s\n' "$DEBUG_PACKAGE" | sed -n "s/.*versionCode='\\([0-9]*\\)'.*/\\1/p")"
+          RELEASE_CODE="$(printf '%s\n' "$RELEASE_PACKAGE" | sed -n "s/.*versionCode='\\([0-9]*\\)'.*/\\1/p")"
+          if [ -z "$RELEASE_CODE" ] || [ "$RELEASE_CODE" != "$DEBUG_CODE" ] ||
+              [ "$RELEASE_CODE" -le 16 ]; then
+            echo "::error::Release versionCode must match debug and exceed historical code 16."
+            exit 1
+          fi
+
+          if "$AAPT" dump badging "$RELEASE" | grep -q '^application-debuggable'; then
+            echo "::error::The release APK is debuggable."
+            exit 1
+          fi
+          if ! "$AAPT" dump badging "$DEBUG" | grep -q '^application-debuggable'; then
+            echo "::error::Debug APK check did not identify debuggable mode."
+            exit 1
+          fi
+          echo "Release verified: stable signing certificate, correct package, versionCode $RELEASE_CODE, non-debuggable."
+
+      - name: Archive signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenguard-android-agent-release-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  # Publication is isolated from signing secrets.
+  # Release publishing is triggered only by approved version tags.
+  publish-release:
+    name: Publish signed GitHub Release
+    needs: [test, signed-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: screenguard-release-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout verified source
+        uses: actions/checkout@v4
+      - name: Download signed APK from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: screenguard-android-agent-release-signed
+          path: release
+      - name: Verify version and release trigger
+        id: version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle.kts | head -n 1)"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || ! "$CODE" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid Android versionName or versionCode."
+            exit 1
+          fi
+          TAG="v$VERSION"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            if [[ "$GITHUB_REF" != "refs/tags/$TAG" ]]; then
+              echo "::error::Tag does not match versionName ($TAG)."
+              exit 1
+            fi
+          elif [[ "$GITHUB_REF" == refs/heads/main && "$TAG" != "v0.5.3" ]]; then
+            echo "Future releases require a version tag, not a main push."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; its APK will not be overwritten."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test -s release/app-release.apk
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
+      - name: Create release with signed APK and checksum
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/verified-release"
+          NAME="screenguard-android-agent-${TAG}.apk"
+          cp release/app-release.apk "$RUNNER_TEMP/verified-release/$NAME"
+          cd "$RUNNER_TEMP/verified-release"
+          sha256sum "$NAME" > "${NAME}.sha256"
+          if [[ -f "$GITHUB_WORKSPACE/docs/releases/${TAG}.md" ]]; then
+            cp "$GITHUB_WORKSPACE/docs/releases/${TAG}.md" release-notes.md
+          else
+            printf 'Signed Android release %s (versionCode %s).\n\nExperimental software; see README for setup and limitations.\n' "$TAG" "$VERSION_CODE" > release-notes.md
+          fi
+          printf '\n### Verification\n\n- Android versionCode: %s\n- APK SHA-256: %s\n- Signed non-debuggable release, verified by Android CI\n' "$VERSION_CODE" "$(cut -d ' ' -f 1 "${NAME}.sha256")" >> release-notes.md
+          gh release create "$TAG" "$NAME" "${NAME}.sha256" \
+            --target "$GITHUB_SHA" \
+            --title "ScreenGuard Android Agent $TAG" \
+            --notes-file release-notes.md
+          gh release view "$TAG" --json url,assets,name

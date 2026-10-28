@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="screen_time_remaining">
+        <item quantity="one">Queda aproximadamente %d minuto de tiempo permitido.</item>
+        <item quantity="other">Quedan aproximadamente %d minutos de tiempo permitido.</item>
+    </plurals>
+</resources>
