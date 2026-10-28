@@ -1,0 +1,47 @@
+name: Verify migrated Android signing secrets (one time)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-signing-migration.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-signing:
+    if: github.repository == 'xavier-le7/screenguard-android-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify original keystore and password without logging secrets
+        shell: bash
+        env:
+          SG_ANDROID_KEYSTORE_B64: ${{ secrets.SG_ANDROID_KEYSTORE_B64 }}
+          SG_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SG_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [[ -z "$SG_ANDROID_KEYSTORE_B64" || -z "$SG_ANDROID_KEYSTORE_PASSWORD" ]]; then
+            echo "::error::Signing secrets are missing from the public repository."
+            exit 1
+          fi
+          export SG_ANDROID_KEYSTORE_B64
+          umask 077
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+          raw = ''.join(os.environ['SG_ANDROID_KEYSTORE_B64'].split())
+          data = base64.b64decode(raw, validate=True)
+          if len(data) < 100:
+              raise SystemExit('Signing keystore is invalid or too small.')
+          Path(os.environ['RUNNER_TEMP'], 'stable-signing.p12').write_bytes(data)
+          PY
+          keytool -list \
+            -keystore "$RUNNER_TEMP/stable-signing.p12" \
+            -storetype PKCS12 \
+            -storepass:env SG_ANDROID_KEYSTORE_PASSWORD \
+            -alias screenguard-agent >/dev/null
+          echo 'Migrated signing keystore and password are usable. No key or password was printed.'
