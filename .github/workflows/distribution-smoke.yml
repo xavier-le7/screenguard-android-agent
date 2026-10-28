@@ -1,0 +1,51 @@
+name: Verify public APK distribution
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/distribution-smoke.yml
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  public-distribution:
+    name: Anonymous Releases and GHCR download
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download public APK and SHA-256 without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://github.com/xavier-le7/screenguard-android-agent/releases/download/v0.5.3'
+          NAME='screenguard-android-agent-v0.5.3.apk'
+          curl --fail --silent --show-error --location --retry 3 --max-time 90 \
+            "$BASE/$NAME" --output "$NAME"
+          curl --fail --silent --show-error --location --retry 3 --max-time 90 \
+            "$BASE/$NAME.sha256" --output "$NAME.sha256"
+          sha256sum --check "$NAME.sha256"
+          echo "Unauthenticated GitHub Releases APK download verified."
+      - name: Verify GHCR package can be pulled anonymously and contains same APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE='ghcr.io/xavier-le7/screenguard-android-agent-apk:v0.5.3'
+          if ! docker pull "$IMAGE"; then
+            echo '::error::Cannot pull GHCR package anonymously. It may be private. Set package visibility to Public.'
+            exit 1
+          fi
+          CID="$(docker create "$IMAGE" /bin/true)"
+          trap 'docker rm -f "$CID" >/dev/null 2>&1 || true' EXIT
+          docker cp "$CID:/screenguard-android-agent.apk" ghcr-release.apk
+          RELEASE_DIGEST="$(sha256sum screenguard-android-agent-v0.5.3.apk | cut -d ' ' -f 1)"
+          GHCR_DIGEST="$(sha256sum ghcr-release.apk | cut -d ' ' -f 1)"
+          if [[ "$RELEASE_DIGEST" != "$GHCR_DIGEST" ]]; then
+            echo "::error::GHCR package and Release assets are not bitwise identical."
+            exit 1
+          fi
+          echo "Public GHCR and GitHub Releases both contain identical verified signed APK ($GHCR_DIGEST)."
