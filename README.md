@@ -31,7 +31,7 @@ For reliable tracking, some Android vendors require manually disabling battery o
 
 ## Downloads and releases
 
-Download maintainer-signed APKs from [GitHub Releases](../../releases) when available. Each release includes an APK and SHA-256 checksum; temporary CI artifacts are not the long-term download location.
+Download maintainer-signed APKs from [GitHub Releases](../../releases) when available. Each release includes an APK and SHA-256 checksum; temporary CI artifacts are not the long-term download location. For automated distribution, the same APK is also archived in [GitHub Packages (GHCR)](../../pkgs/container/screenguard-android-agent-apk) as a non-runnable OCI package.
 
 See [Releasing](docs/RELEASING.md) for the tag process. This is experimental software, not a certified anti-tampering product.
 
