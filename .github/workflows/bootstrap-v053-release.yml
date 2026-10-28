@@ -1,0 +1,131 @@
+name: Bootstrap verified v0.5.3 public release (one time)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/bootstrap-v053-release.yml
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce-signed-apk:
+    if: github.repository == 'xavier-le7/screenguard-android-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify privacy
+        run: python3 scripts/check-public-snapshot.py
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android API 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Restore validated signing keystore
+        shell: bash
+        env:
+          SIGNING_KEYSTORE_B64: ${{ secrets.SG_ANDROID_KEYSTORE_B64 }}
+          SIGNING_PASSWORD: ${{ secrets.SG_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$SIGNING_KEYSTORE_B64"
+          test -n "$SIGNING_PASSWORD"
+          umask 077
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          raw = ''.join(os.environ['SIGNING_KEYSTORE_B64'].split())
+          key = base64.b64decode(raw, validate=True)
+          if len(key) < 100: raise SystemExit('Invalid keystore.')
+          Path(os.environ['RUNNER_TEMP'], 'screenguard-original.p12').write_bytes(key)
+          PY
+          keytool -list -keystore "$RUNNER_TEMP/screenguard-original.p12" -storetype PKCS12 \
+            -storepass:env SIGNING_PASSWORD -alias screenguard-agent >/dev/null
+      - name: Build exact v0.5.3 APK with the original signing key
+        env:
+          SG_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/screenguard-original.p12
+          SG_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SG_ANDROID_KEYSTORE_PASSWORD }}
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
+      - name: Compare signed APK against the tested private v0.5.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$APK" |
+            sed -n '/Signer #1 certificate SHA-256 digest:/p'
+          BADGING="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK")"
+          grep -F "name='fr.sevenskies.screenguard.agent'" <<< "$BADGING" >/dev/null
+          grep -F "versionCode='18'" <<< "$BADGING" >/dev/null
+          grep -F "versionName='0.5.3'" <<< "$BADGING" >/dev/null
+          if grep -q '^application-debuggable' <<< "$BADGING"; then
+            echo "::error::Unexpected debuggable release APK."
+            exit 1
+          fi
+          EXPECTED='1dbc7b7964dd9980a51cea16f717c838d54bc4663f1ab9ffb8c0f01075734f05'
+          ACTUAL="$(sha256sum "$APK" | cut -d ' ' -f1)"
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "::error::Release APK does not match the existing tested v0.5.3 (expected $EXPECTED, got $ACTUAL)."
+            echo 'No release will be published. Upload the original tested APK manually.'
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$APK" dist/screenguard-android-agent-v0.5.3.apk
+          printf '%s  %s\n' "$ACTUAL" 'screenguard-android-agent-v0.5.3.apk' > dist/screenguard-android-agent-v0.5.3.apk.sha256
+          echo 'Verified bit-for-bit reproduction of the existing tested v0.5.3 APK.'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-v053-release
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: reproduce-signed-apk
+    if: github.repository == 'xavier-le7/screenguard-android-agent'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-v053-release
+          path: dist
+      - name: Publish v0.5.3 only if no existing release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.5.3 >/dev/null 2>&1; then
+            echo 'v0.5.3 is already published; no replacement.'
+            exit 0
+          fi
+          (
+            cd dist
+            sha256sum --check screenguard-android-agent-v0.5.3.apk.sha256
+          )
+          gh release create v0.5.3 \
+            dist/screenguard-android-agent-v0.5.3.apk \
+            dist/screenguard-android-agent-v0.5.3.apk.sha256 \
+            --target "$GITHUB_SHA" \
+            --title 'ScreenGuard Android Agent v0.5.3' \
+            --notes-file docs/releases/v0.5.3.md
+          echo 'Verified public release v0.5.3 published.'
