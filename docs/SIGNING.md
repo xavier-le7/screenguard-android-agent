@@ -14,7 +14,7 @@ The resulting debug APK uses a developer-specific signing certificate unless the
 
 ## Creating your own stable signing key
 
-For maintainers and forks, generate a **new** key on a trusted machine, outside the repository:
+The official maintainer must **reuse the existing signing keystore** to preserve in-place upgrades. Only new forks or maintainers creating a genuinely separate application should generate a **new** key on a trusted machine, outside the repository:
 
 ```bash
 mkdir -p "$HOME/.local/share/screenguard-signing"
@@ -44,9 +44,9 @@ Keep both the key and the encoded file out of Git. **Never paste signing credent
 
 The `test` job checks untrusted pull requests **without secrets**, running unit tests and compiling a debug APK.
 
-The `signed-release` job runs only after a successful test job and only for reviewed pushes to `main` or a maintainer-invoked `workflow_dispatch`. It restores the stable PKCS#12 from GitHub Actions secrets, builds debug and release, verifies both signatures and checks that the **release is not debuggable**. The resulting artifact is called `screenguard-android-agent-release-signed`.
+The `signed-release` job runs only after successful tests and **only when a version tag (`vX.Y.Z`) is pushed**, for a commit belonging to `main`. It restores the stable PKCS#12 from GitHub Actions secrets, builds debug and release, verifies both signatures and checks that the **release is not debuggable**. The resulting artifact is called `screenguard-android-agent-release-signed`.
 
-Do not run a manual signing workflow on an unreviewed branch. Restrict who can write `main` and who can manage GitHub Actions secrets.
+Protect `main` and `v*` version tags, review all changes to build workflows before merging, and restrict who can manage GitHub Actions secrets. Do not configure signing secrets on an untrusted fork.
 
 ## Upgrade safety
 
