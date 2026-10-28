@@ -10,7 +10,7 @@ The signing keystore is **not part of the source**. Store its base64 representat
 
 ## Public CI
 
-Pull requests and mainline pushes run source privacy checks, JVM unit tests and debug compilation **without** signing secrets. The signed-release, GHCR package, and GitHub Release jobs normally run **only when a `vX.Y.Z` tag is pushed**, after those checks succeed. A one-time pinned `main` bootstrap is used to verify and publish v0.5.3; it cannot trigger on later commits. Before signing, the job verifies that the tagged commit is on `main` and that its version matches `versionName` in `app/build.gradle.kts`. The release APK and corresponding SHA-256 checksum are published together. Existing releases are never silently overwritten.
+Pull requests and mainline pushes run source privacy checks, JVM unit tests and debug compilation **without** signing secrets. The signed-release, GHCR package, and GitHub Release jobs normally run **only when a `vX.Y.Z` tag is pushed**, after those checks succeed. The one-time verified `main` bootstrap published v0.5.3 successfully on 2026-10-28; it has been removed from the CI filters, leaving **tag-only** signing and publication for later versions. Before signing, the job verifies that the tagged commit is on `main` and that its version matches `versionName` in `app/build.gradle.kts`. The release APK and corresponding SHA-256 checksum are published together. Existing releases are never silently overwritten.
 
 Protect the `main` branch and `v*` tags with repository rulesets and restrict direct write access. GitHub Actions secrets are not passed to fork pull-request jobs, but malicious changes merged into a trusted signing workflow could expose credentials, so **review workflow changes particularly carefully**.
 
