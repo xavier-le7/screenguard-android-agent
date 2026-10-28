@@ -46,7 +46,7 @@ jobs:
 
   # Public pull requests and main pushes never receive signing secrets.
   signed-release:
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event.head_commit.message == 'ci: verify full public release pipeline for v0.5.3'))
+    if: "github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event.head_commit.message == 'ci: verify full public release pipeline for v0.5.3'))"
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -194,7 +194,7 @@ jobs:
   publish-ghcr:
     name: Publish APK package to GHCR
     needs: [test, signed-release]
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event.head_commit.message == 'ci: verify full public release pipeline for v0.5.3'))
+    if: "github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event.head_commit.message == 'ci: verify full public release pipeline for v0.5.3'))"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -247,7 +247,7 @@ jobs:
   publish-release:
     name: Publish signed GitHub Release
     needs: [test, signed-release, publish-ghcr]
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event.head_commit.message == 'ci: verify full public release pipeline for v0.5.3'))
+    if: "github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event.head_commit.message == 'ci: verify full public release pipeline for v0.5.3'))"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
