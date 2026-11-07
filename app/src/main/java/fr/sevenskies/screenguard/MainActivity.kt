@@ -86,6 +86,9 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
     private lateinit var trackingAction: TextView
     private lateinit var restrictAction: TextView
     private lateinit var sensitiveAction: TextView
+    private lateinit var dnsStatusView: TextView
+    private lateinit var dnsEnableAction: TextView
+    private lateinit var dnsDisableAction: TextView
     private lateinit var notificationAction: TextView
     private var pendingAdminRequest = false
     private lateinit var diagnosticText: TextView
@@ -376,12 +379,13 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
                 "Il peut entrer en conflit avec un autre VPN.", 12f, MUTED
         ))
         space(setupPanel, 9)
-        setupPanel.addView(action("Activer / arrêter le filtrage DNS local", false) {
+        dnsStatusView = label("", 14f, NAVY, true)
+        setupPanel.addView(dnsStatusView)
+        space(setupPanel, 8)
+        dnsEnableAction = action("Activer le filtrage DNS", false) {
             requireParent {
                 if (DnsVpnService.isRunning) {
-                    startService(Intent(this, DnsVpnService::class.java)
-                        .setAction(DnsVpnService.ACTION_STOP))
-                    inform("Arrêt du filtrage DNS demandé.")
+                    inform("Filtrage DNS déjà actif.")
                 } else {
                     val permission = VpnService.prepare(this)
                     if (permission != null) {
@@ -390,11 +394,32 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
                     } else {
                         startForegroundService(Intent(this, DnsVpnService::class.java)
                             .setAction(DnsVpnService.ACTION_START))
-                        inform("Filtrage DNS local demandé ; surveiller sa notification.")
+                        inform("Démarrage du VPN DNS demandé.")
                     }
                 }
+                updateDnsControls()
             }
-        }, full(48))
+        }
+        setupPanel.addView(dnsEnableAction, full(48))
+        space(setupPanel, 7)
+        dnsDisableAction = action("Désactiver le filtrage DNS", false, true) {
+            requireParent {
+                // Intentional independent STOP, not a toggle based on a
+                // potentially stale in-memory service flag.
+                DnsVpnService.requestStop(this)
+                runCatching {
+                    startService(Intent(this, DnsVpnService::class.java)
+                        .setAction(DnsVpnService.ACTION_STOP))
+                }.onFailure {
+                    // Preserve explicit parent choice even when Android rejects
+                    // an on-demand service start from an activity.
+                    stopService(Intent(this, DnsVpnService::class.java))
+                }
+                inform("Arrêt du filtrage DNS demandé ; le VPN doit disparaître.")
+                updateDnsControls()
+            }
+        }
+        setupPanel.addView(dnsDisableAction, full(48))
         space(setupPanel, 8)
         setupPanel.addView(label("PROTECTION DES RÉGLAGES", 11f, MUTED, true))
         space(setupPanel, 6)
@@ -547,7 +572,23 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
         diagnosticToggle.text = loc("Diagnostic avancé") + "  " + if (diagnosticsExpanded) "⌃" else "⌄"
     }
 
+    private fun updateDnsControls() {
+        if (!::dnsStatusView.isInitialized) return
+        val mode = DnsVpnService.status(this)
+        dnsStatusView.text = loc("Filtrage DNS : $mode")
+        dnsStatusView.setTextColor(if (DnsVpnService.isRunning) TEAL else MUTED)
+        if (::dnsEnableAction.isInitialized) {
+            dnsEnableAction.isEnabled = !DnsVpnService.isRunning
+            dnsEnableAction.alpha = if (dnsEnableAction.isEnabled) 1f else 0.45f
+        }
+        // Always permit explicit STOP, including stale/inconsistent VPN state.
+        if (::dnsDisableAction.isInitialized) {
+            dnsDisableAction.isEnabled = true
+        }
+    }
+
     private fun updateDashboard() {
+        updateDnsControls()
         val now = System.currentTimeMillis()
         val paired = store.loadToken() != null
         val statsAllowed = ledger.hasPermission()
