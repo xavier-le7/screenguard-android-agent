@@ -14,6 +14,7 @@ object AppGroupPolicy {
     data class Rule(val kind: String, val value: String, val exclude: Boolean)
     data class Group(
         val id: String, val name: String, val rules: List<Rule>,
+        val builtin: String? = null,
         val dailyLimits: Map<Int, Int>, val adjustmentToday: Int
     )
     data class Config(
@@ -55,7 +56,8 @@ object AppGroupPolicy {
                 val minutes = limit.optInt("allowed_minutes", -1)
                 if (day in 0..6 && minutes in 0..1440) limits[day] = minutes
             }
-            groups.add(Group(id, obj.optString("name").take(120), rules, limits,
+            groups.add(Group(id, obj.optString("name").take(120), rules,
+                obj.optString("builtin").takeIf { it.isNotBlank() }, limits,
                 obj.optInt("adjustment_today", 0).coerceIn(-1440, 1440)))
         }
         val approval = user.optJSONObject("app_approval")
@@ -98,11 +100,12 @@ object AppGroupPolicy {
                     (elsewhereSeconds[group.id] ?: 0L).coerceAtLeast(0L)
             ).coerceAtLeast(0L)
         }
-        val blocked = denied || needsApproval || secondsRemaining == 0L
+        val blocked = denied || needsApproval || group?.builtin == "blocked" || secondsRemaining == 0L
         return Decision(group?.id, blocked, needsApproval, secondsRemaining,
             when {
                 denied -> "parent_denied"
                 needsApproval -> "approval_required"
+                group?.builtin == "blocked" -> "parent_denied"
                 secondsRemaining == 0L -> "group_limit"
                 else -> "allow"
             })
