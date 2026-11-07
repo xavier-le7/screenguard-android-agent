@@ -21,6 +21,9 @@ import fr.sevenskies.screenguard.i18n.ScreenGuardI18n
 import fr.sevenskies.screenguard.MainActivity
 import fr.sevenskies.screenguard.network.ScreenGuardClient
 import fr.sevenskies.screenguard.storage.AgentStore
+import fr.sevenskies.screenguard.storage.AppPolicyStore
+import fr.sevenskies.screenguard.usage.AppUsageLedger
+import fr.sevenskies.screenguard.enforcement.AppGroupPolicy
 import fr.sevenskies.screenguard.storage.TrackingStatus
 import fr.sevenskies.screenguard.usage.UsageLedger
 
@@ -35,6 +38,8 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     private lateinit var store: AgentStore
     private lateinit var state: TrackingStatus
     private lateinit var ledger: UsageLedger
+    private lateinit var appLedger: AppUsageLedger
+    private lateinit var appPolicies: AppPolicyStore
     private lateinit var diagnostics: AgentDiagnostics
     private var client: ScreenGuardClient? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -80,6 +85,14 @@ class TrackingService : Service(), ScreenGuardClient.Events {
             } catch (t: Exception) {
                 state.message = "Collecte locale indisponible : " + t.javaClass.simpleName
             }
+            if (running && ledger.hasPermission()) {
+                runCatching {
+                    appLedger.collect(appPolicies.config() ?: AppGroupPolicy.Config(
+                        emptyList(), null, emptySet()))
+                }.onFailure {
+                    Log.w("ScreenGuardApps", "App usage sample unavailable", it)
+                }
+            }
             if (running) {
                 ProtectionHealthReporter.check(this@TrackingService, state, ledger.hasPermission())
                 handler.postDelayed(this, SAMPLE_INTERVAL_MILLIS)
@@ -92,6 +105,8 @@ class TrackingService : Service(), ScreenGuardClient.Events {
         store = AgentStore(this)
         state = TrackingStatus(this)
         ledger = UsageLedger(this)
+        appLedger = AppUsageLedger(this)
+        appPolicies = AppPolicyStore(this)
         diagnostics = AgentDiagnostics(this)
     }
 
@@ -122,10 +137,17 @@ class TrackingService : Service(), ScreenGuardClient.Events {
                 if (ledger.collect()) {
                     state.lastCollectionMillis = System.currentTimeMillis()
                 }
+                appLedger.collect(appPolicies.config() ?: AppGroupPolicy.Config(
+                    emptyList(), null, emptySet()))
             }.onFailure {
                 state.message = "Statistiques indisponibles : " + it.javaClass.simpleName
             }
-            client = ScreenGuardClient(store, this) { ledger.usageSnapshot() }
+            client = ScreenGuardClient(
+                store, this, { ledger.usageSnapshot() },
+                { appLedger.snapshot() },
+                { appLedger.foregroundApp() },
+                appPolicies
+            )
             client?.connect()
             // Screen-unlock triggers a refresh even after prolonged Doze.
             registerReceiver(wakeReceiver, IntentFilter().apply {
@@ -211,6 +233,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     }
 
     override fun unpaired() {
+        appPolicies.clear()
         diagnostics.record(AgentDiagnostics.Event.AGENT_UNPAIRED)
         state.restrictionsEnabled = false
         state.trackingEnabled = false
