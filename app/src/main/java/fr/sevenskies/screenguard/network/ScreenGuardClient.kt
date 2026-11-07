@@ -1,6 +1,7 @@
 package fr.sevenskies.screenguard.network
 
-import fr.sevenskies.screenguard.BuildConfig\nimport fr.sevenskies.screenguard.protocol.ScreenGuardProtocol
+import fr.sevenskies.screenguard.BuildConfig
+import fr.sevenskies.screenguard.protocol.ScreenGuardProtocol
 import fr.sevenskies.screenguard.storage.AgentStore
 import okhttp3.OkHttpClient
 import okhttp3.Request

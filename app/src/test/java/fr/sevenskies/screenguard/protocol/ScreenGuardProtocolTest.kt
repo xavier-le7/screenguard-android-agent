@@ -23,7 +23,8 @@ class ScreenGuardProtocolTest {
             ScreenGuardProtocol.agentHello("machine-2", "Android-Sam", "Europe/Paris", "0.5.3")
         ).getJSONObject("payload")
         assertEquals(0, payload.getInt("last_config_version"))
-        assertEquals("Europe/Paris", payload.getString("timezone"))\n        assertEquals("0.5.3", payload.getString("agent_version"))
+        assertEquals("Europe/Paris", payload.getString("timezone"))
+        assertEquals("0.5.3", payload.getString("agent_version"))
         assertEquals(0, payload.getJSONArray("capabilities").length())
     }
 
