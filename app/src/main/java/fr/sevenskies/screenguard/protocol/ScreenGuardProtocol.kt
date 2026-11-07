@@ -40,8 +40,7 @@ object ScreenGuardProtocol {
         require(versionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+"))) {
             "Android app version must be a numeric ScreenGuard-compatible semver"
         }
-        return
-        envelope(
+        return envelope(
             "agent_hello",
             JSONObject()
                 .put("machine_id", machineId)
