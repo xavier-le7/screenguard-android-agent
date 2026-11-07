@@ -14,3 +14,12 @@ contents. Existing screen-time accounting stays separate from per-app tracking.
 The `app_usage` capability must only be advertised with active Android
 Usage Access. No compatibility claim for `web_filter` is made until Android
 VPN filtering is functional and tested on a device.
+
+## On-device acceptance tests
+
+1. Compare Android foreground app totals to observed usage and confirm the global screen-time ledger remains unchanged.
+2. Verify two apps assigned to a group are not counted concurrently on a single-foreground Android screen, and verify combined quotas with another agent.
+3. Start an unknown app, check the server receives an approval request even if the app is closed immediately, then approve it and verify access returns.
+4. Verify blocked-group and exhausted per-app limits apply only to the app, never Android Settings, launchers or emergency apps.
+5. Reboot, reconnect and verify cumulative totals never double-count.
+6. Verify an upgrade from the signed v0.5.3, keeping the same app identity, signing key and paired token.
