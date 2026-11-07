@@ -37,6 +37,18 @@ class ScreenGuardProtocolTest {
         assertEquals("0.10.18", payload.getString("agent_version"))
     }
 
+    @Test fun webFilterCapabilityCanFollowLiveVpnState() {
+        fun hello(dnsRunning: Boolean) = JSONObject(ScreenGuardProtocol.agentHello(
+            "tablet", "Android", "Europe/Paris", "0.10.18",
+            if (dnsRunning) listOf("app_usage", "web_filter") else listOf("app_usage")
+        )).getJSONObject("payload").getJSONArray("capabilities")
+
+        assertEquals(2, hello(true).length())
+        assertEquals("web_filter", hello(true).getString(1))
+        assertEquals(1, hello(false).length())
+        assertEquals("app_usage", hello(false).getString(0))
+    }
+
     @Test fun userListKeepsStableLocalUid() {
         val obj = JSONObject(ScreenGuardProtocol.userListUpdate("Alex"))
         val user = obj.getJSONObject("payload")
