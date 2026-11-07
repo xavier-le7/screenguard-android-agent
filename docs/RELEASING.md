@@ -1,35 +1,53 @@
-# Releasing ScreenGuard Android Agent
+# Publishing ScreenGuard Android Agent
 
-GitHub Releases are the public distribution channel for maintainer-signed APKs; workflow artifacts expire.
+The **current stable public release is [v0.10.18](https://github.com/xavier-le7/screenguard-android-agent/releases/tag/v0.10.18)** (`versionCode 21`). Normal Android distribution uses GitHub Releases; GitHub Packages is a separate, non-runnable OCI archive containing the same APK. Do not direct users to short-lived GitHub Actions artifacts for stable installation.
 
-## What remains private
+## Versioning and upgrade compatibility
 
-The signing keystore is **not part of the source**. Store its base64 representation in the GitHub Actions secret `SG_ANDROID_KEYSTORE_B64` and its password in `SG_ANDROID_KEYSTORE_PASSWORD`. Keep an offline encrypted backup of the original PKCS#12 keystore. Neither value should appear in issues, pull requests, logs, commits or documentation.
+- Android package: `fr.sevenskies.screenguard.agent`. **Do not change it** for official updates.
+- Android `versionName` is numeric and matches the release tag, e.g. `0.10.18` → `v0.10.18`; it is also announced to the ScreenGuard server as `agent_version`.
+- Android `versionCode` **must increase** for every new official upgrade: v0.5.3 used 18; v0.10.18 uses **21**. Do not reuse 21 for the next update.
+- The maintainer must reuse the **same PKCS#12 signing certificate** so installed users can update without uninstalling or losing their pairing and private data.
+- Don't claim full Linux feature parity merely because the Android and server release numbers match. Document Android-specific limitations, especially the DNS-only VPN.
 
-**Keep the same certificate** and `applicationId` used for previously installed maintainer APKs, so upgrades can preserve pairing and application data. A new signing key would prevent ordinary in-place upgrades.
+## Signing secrets
 
-## Public CI
+The signing keystore is **not committed**. The official tag-triggered workflow reads two GitHub Actions repository secrets:
 
-Pull requests and mainline pushes run source privacy checks, JVM unit tests and debug compilation **without** signing secrets. The signed-release, GHCR package, and GitHub Release jobs normally run **only when a `vX.Y.Z` tag is pushed**, after those checks succeed. The one-time verified `main` bootstrap published v0.5.3 successfully on 2026-10-28; it has been removed from the CI filters, leaving **tag-only** signing and publication for later versions. Before signing, the job verifies that the tagged commit is on `main` and that its version matches `versionName` in `app/build.gradle.kts`. The release APK and corresponding SHA-256 checksum are published together. Existing releases are never silently overwritten.
+- `SG_ANDROID_KEYSTORE_B64`: base64 encoding of the original maintainer PKCS#12 keystore.
+- `SG_ANDROID_KEYSTORE_PASSWORD`: password to that keystore.
 
-Protect the `main` branch and `v*` tags with repository rulesets and restrict direct write access. GitHub Actions secrets are not passed to fork pull-request jobs, but malicious changes merged into a trusted signing workflow could expose credentials, so **review workflow changes particularly carefully**.
+Keep an **encrypted offline backup** of the original key and password, outside GitHub. Never print either secret in CI, issues, pull requests, chats or release notes. Forks need separate signing certificates and ideally distinct package IDs.
 
-## First public release: v0.5.3
+See [Signing](SIGNING.md) and [Security](SECURITY.md).
 
-The public v0.5.3 is produced from the reviewed public source snapshot using the **migrated original maintainer signing certificate**. Its APK SHA-256 can differ from the previously published private-repository build because build outputs are not necessarily reproducible byte-for-byte. This is not a change of package ID, signing certificate or Android versionCode. The public APK is verified as signed, non-debuggable, versionCode 18, and is accompanied by its **own calculated SHA-256 checksum**.
+## CI and public distributions
 
-Do not uninstall or reinstall existing v0.5.3 installations to replace the build. Their next normal upgrade should have a higher versionCode (v0.5.4 or later).
+The [Android CI workflow](../.github/workflows/android-ci.yml) runs these jobs:
 
-## Next versions
+1. **test** — privacy preflight, JVM unit tests and debug compilation for pull requests, ordinary main pushes and tags; no maintainer signing secrets on fork PRs.
+2. **signed-release** — on an approved `vX.Y.Z` tag whose commit is included in `main`: restore the stable keystore, build debug/release APKs, verify signing identity, version and release non-debuggability; archive the signed release APK.
+3. **publish-ghcr** — publish that signed APK as a non-runnable OCI archive to `ghcr.io/xavier-le7/screenguard-android-agent-apk:vX.Y.Z`.
+4. **publish-release** — publish `screenguard-android-agent-vX.Y.Z.apk` and the matching `.apk.sha256` to GitHub Releases. Existing releases are not silently overwritten.
 
-1. Increment `versionCode` and update `versionName` in `app/build.gradle.kts` on `main`; review and test the result.
-2. Add generic release notes under `docs/releases/vX.Y.Z.md`.
-3. Push the reviewed, protected Git tag `vX.Y.Z` matching the application version.
-4. Monitor tests, signing certificate checks, GitHub Packages (GHCR) publication and GitHub Release publication.
-5. Verify the downloaded APK's SHA-256 checksum and upgrade it on an existing installation without uninstalling.
+The [distribution smoke test](../.github/workflows/distribution-smoke.yml) validates **unauthenticated** downloads from Releases and GHCR and byte-identical APKs in both channels. The workflow currently checks v0.10.18; update its pinned target for each new stable release.
 
-## GitHub Packages
+Protect the `main` branch and `v*` tags with repository rulesets, limit workflow and secret editing, and review changes before allowing production signing. A `latest` Docker tag is **not** itself an Android release/update mechanism.
 
-GitHub Packages does not provide a native installer for Android APKs. The pipeline also publishes the **same signed APK** as a minimal non-runnable OCI archive on `ghcr.io/xavier-le7/screenguard-android-agent-apk:vX.Y.Z`. This is for CI and automation use, **not** an Android application container or a substitute for the APK in Releases. The first GHCR package might default to private; the owner can make it public under package settings. Only the packaging job has `packages:write` permission, and its artifact comes from the same signed build as the GitHub Release.
+## Maintainer release procedure
 
-Upstream integration and contributions are welcome under AGPL-3.0-or-later.
+1. Merge reviewed code into `main` after unit, debug and actual Android-device testing (Usage Access, Accessibility, app quotas, approvals, DNS ON/OFF, reboot, notifications and server sync).
+2. Update `app/build.gradle.kts`: increment `versionCode` and set a new numeric `versionName`.
+3. Update README, protocol/version policy, setup/privacy/security docs and add `docs/releases/vX.Y.Z.md` with capabilities, limitations and migration notes.
+4. Confirm no old release already uses that tag. Create the **reviewed, protected** `vX.Y.Z` tag on the intended `main` commit; don't retag or overwrite a previously distributed signed APK.
+5. Verify **all four GitHub Actions jobs succeed**. The tag must match `versionName`.
+6. Check the public GitHub Release assets and SHA-256, GHCR package, anonymous downloads and matching APKs (smoke test).
+7. Upgrade an existing official signed installation **without uninstalling**. Confirm pairing, permissions, app usage, blocked groups, remote logs, DNS controls and boot persistence.
+
+## Historical releases
+
+- **v0.5.3** was the first public maintainer-signed release (`versionCode 18`), aligned with the earlier 0.10.17 server API.
+- **v0.10.18** (`versionCode 21`) was released after testing the TEST3 Android candidate. The public APK is signed with the same certificate and uses ScreenGuard server 0.10.18's per-app protocol.
+- Earlier temporary TEST1/TEST2/TEST3 workflow artifacts are **not public stable releases** and may expire; do not use them for future installation instructions.
+
+The source is [GNU AGPL-3.0-or-later](../LICENSE), independent of the original [ScreenGuard](https://github.com/adambie/screenguard) project. External contributors are welcome.

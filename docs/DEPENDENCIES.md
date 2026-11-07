@@ -17,7 +17,15 @@ The OkHttp dependency also pulls in components such as Okio and Kotlin standard 
 - The ScreenGuard server and Linux agent are authored by their [upstream contributors](https://github.com/adambie/screenguard).
 - The [ScreenGuard Mobile](https://github.com/adambie/screenguard-mobile) parent application is a separate upstream project.
 - Both upstream repositories include the GNU Affero General Public License v3 text. The mobile repository explicitly specifies `AGPL-3.0-or-later`.
-- The Android agent speaks the existing ScreenGuard v0.10.17 wire protocol. This statement of compatibility does not imply upstream authorship or endorsement.
+- The Android agent speaks the existing ScreenGuard v0.10.18 wire protocol. This statement of compatibility does not imply upstream authorship or endorsement.
+
+## Android platform APIs
+
+Android UsageStatsManager, AccessibilityService, VpnService and Android Keystore
+are platform APIs, **not additional bundled third-party libraries**. The v0.10.18
+agent optionally uses `QUERY_ALL_PACKAGES`, legacy Device Administrator and
+foreground-service special-use declarations, which require separate policy
+review for store distribution.
 
 ## Before publishing
 

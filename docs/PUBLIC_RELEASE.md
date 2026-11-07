@@ -2,6 +2,12 @@
 
 This repository is a clean-history, public snapshot. It deliberately excludes the former development commit history, historical GitHub Actions logs, signing key material and personal test data. No private backend configuration is included.
 
+## Published status
+
+The [v0.10.18 release](https://github.com/xavier-le7/screenguard-android-agent/releases/tag/v0.10.18) is public, signed with the stable maintainer certificate (Android versionCode 21), and contains the v0.10.18 protocol, app usage, group restrictions, parent approvals, remote diagnostics and experimental opt-in DNS-only VPN.
+
+Passing the CI/security preflight is **not** a formal third-party audit. The DNS filter has known encrypted-DNS/IPv6 and competing-VPN limitations. Read [DNS](ANDROID_DNS.md), [Security](SECURITY.md) and [Privacy](PRIVACY.md) before deploying widely.
+
 ## Checks for each contribution
 
 - [x] Project licensed under GNU AGPL-3.0-or-later; [LICENSE](../LICENSE).

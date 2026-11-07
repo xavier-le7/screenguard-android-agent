@@ -50,7 +50,7 @@ Protect `main` and `v*` version tags, review all changes to build workflows befo
 
 ## Upgrade safety
 
-The existing Android application ID is `fr.sevenskies.screenguard.agent`. It is retained for **in-place upgrades of existing installs**. A fork changing the ID or signing certificate becomes a separate app and cannot update the original.
+The official v0.10.18 release uses application ID `fr.sevenskies.screenguard.agent`, `versionName 0.10.18` and `versionCode 21`. It retains the maintainer signing certificate for **in-place upgrades of signed v0.5.3 and earlier TEST builds**. A fork changing the ID or signing certificate becomes a separate app and cannot update the original.
 
 To upgrade, install a higher-`versionCode` APK with the **same signing certificate** directly over the app. Do not uninstall the existing app first: doing so deletes its locally stored pairing token, settings and usage counters.
 

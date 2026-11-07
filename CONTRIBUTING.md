@@ -1,6 +1,6 @@
 # Contributing
 
-This project is an independent Android client for ScreenGuard v0.10.17.
+This project is an independent Android client for ScreenGuard v0.10.18.
 
 ## Before contributing
 
@@ -19,14 +19,18 @@ Required tooling: Java 17, Gradle 8.9 and Android SDK 35.
 gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
-Test quota accounting, UI permissions, network reconnection and message parsing when changing related features. Android instrumentation/manual device validation is required for manufacturer-specific Accessibility screens; passing unit tests alone is not sufficient.
+Test whole-device and per-app accounting independently, app-group/approval rules, offline cumulative upserts, UI permissions, network reconnection, and message parsing when changing related features. Android instrumentation/manual device validation is required for manufacturer-specific Accessibility screens **and VPN behavior**; passing unit tests alone is not sufficient. Verify the explicit parent-PIN-protected DNS ON/OFF actions and retained restart choice, Android's VPN consent, the server's `web_filter_available` indicator and `fetch_logs` diagnostics. Avoid claiming bypass-resistant filtering: browser DoH/DoT, IPv6 DNS and other VPNs are limitations.
 
 ## Pull requests and releases
 
-Pull requests run a test/compile job without maintainer signing secrets. Maintainer-only signed release jobs run on reviewed mainline changes or an explicitly initiated trusted workflow. Never share or request a private keystore.
+Pull requests run a test/compile job without maintainer signing secrets. The official signed release, GitHub Packages and GitHub Release workflows are **tag-triggered** (reviewed `vX.Y.Z` tags pointing to `main`). Never use or copy maintainer signing secrets in pull requests. Never share or request a private keystore.
 
 All contributions to this Android agent are submitted under **GNU AGPL-3.0-or-later**, unless explicitly agreed otherwise in writing. Contributors must have the necessary rights to submit their changes. Do not copy code from projects under incompatible terms.
 
-Maintainers of the original ScreenGuard project are explicitly welcome to reuse, adapt or integrate this agent under the applicable AGPL terms. Please coordinate API/protocol changes with upstream rather than changing the ScreenGuard v0.10.17 server in this repository.
+Maintainers of the original ScreenGuard project are explicitly welcome to reuse, adapt or integrate this agent under the applicable AGPL terms. Please coordinate API/protocol changes with upstream rather than changing the ScreenGuard v0.10.18 server in this repository.
 
 Do not assume publication readiness solely because the current source has been sanitized: old Git history and attachments must be independently checked.
+
+## Documentation review
+
+Update `README.md`, `docs/PROTOCOL.md`, `docs/ROADMAP.md`, `docs/PHASE3.md`, and the relevant feature/security/privacy guides when changing behavior. Document which features are released versus experimental, and distinguish the server's capability badge from a live runtime state. Follow the matching `versionName` / increasing `versionCode` rule for supported Android upgrades.
