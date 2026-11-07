@@ -41,18 +41,33 @@ class AppUsageLedger(private val context: Context) {
         val anchor = now - SystemClock.elapsedRealtime()
         val old = prefs.getLong("checkpoint", 0)
         val priorAnchor = prefs.getLong("boot_anchor", 0)
-        if (old == 0L || now <= old || now - old > 3L * 24 * 3600 * 1000 ||
-            priorAnchor == 0L || abs(priorAnchor - anchor) > 120_000L) {
-            checkpoint(now, anchor, null, power.isInteractive, !keyguard.isKeyguardLocked, null, null)
-            return@synchronized true
+        // Reconstruct today's foreground sessions at first install, after a
+        // reboot, or after the Android event history was interrupted.
+        // The previous implementation started with foreground=null and silently
+        // ignored apps already running when ScreenGuard was first enabled.
+        val bootstrap = old == 0L || now <= old || now - old > 3L * 24 * 3600 * 1000 ||
+            priorAnchor == 0L || abs(priorAnchor - anchor) > 120_000L
+        val dayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+        val queryFrom = if (bootstrap) dayStart else old
+        val events = usage.queryEvents(queryFrom, now) ?: run {
+            saveScan("events_unavailable", 0, 0, bootstrap)
+            return@synchronized false
         }
-        val events = usage.queryEvents(old, now) ?: return@synchronized false
+        // Bootstrap replaces only today's totals: additive replay on top of old
+        // counters would charge the same usage twice after an Android reboot.
         val apps = parseTotals("apps")
         val groups = parseTotals("groups")
-        var foreground = prefs.getString("foreground", null)
-        var interactive = prefs.getBoolean("interactive", false)
-        var unlocked = prefs.getBoolean("unlocked", false)
-        var cursor = old
+        if (bootstrap) {
+            val datePrefix = LocalDate.now(zone).toString() + "|"
+            apps.keys.removeAll { it.startsWith(datePrefix) }
+            groups.keys.removeAll { it.startsWith(datePrefix) }
+        }
+        var foreground = if (bootstrap) null else prefs.getString("foreground", null)
+        var interactive = if (bootstrap) false else prefs.getBoolean("interactive", false)
+        var unlocked = if (bootstrap) false else prefs.getBoolean("unlocked", false)
+        var cursor = queryFrom
+        var eventCount = 0
+        var resumedCount = 0
         val event = UsageEvents.Event()
         fun credit(until: Long) {
             val pkg = foreground
@@ -68,11 +83,20 @@ class AppUsageLedger(private val context: Context) {
         }
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
+            eventCount++
             val time = event.timeStamp.coerceIn(cursor, now)
             credit(time)
             when (event.eventType) {
                 UsageEvents.Event.ACTIVITY_RESUMED, UsageEvents.Event.MOVE_TO_FOREGROUND -> {
                     foreground = event.packageName
+                    resumedCount++
+                    // A resumed activity is evidence the display was usable;
+                    // pre-existing screen/keyguard events may be outside the
+                    // first queried window on some Samsung firmware.
+                    if (bootstrap) {
+                        interactive = true
+                        unlocked = true
+                    }
                 }
                 UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.MOVE_TO_BACKGROUND -> {
                     if (foreground == event.packageName) foreground = null
@@ -87,7 +111,37 @@ class AppUsageLedger(private val context: Context) {
         val next = foreground?.takeIf(::eligible)
         checkpoint(now, anchor, next, power.isInteractive,
             !keyguard.isKeyguardLocked, apps, groups)
+        saveScan(if (apps.isEmpty()) "no_app_intervals" else "ok",
+            eventCount, resumedCount, bootstrap)
         true
+    }
+
+    /**
+     * Safe counters for server-initiated fetch_logs. Never expose app names,
+     * package names, URLs, credentials or actual usage events.
+     */
+    fun diagnosticSummary(): String = synchronized(LOCK) {
+        val day = LocalDate.now(zone).toString() + "|"
+        val today = parseTotals("apps").filterKeys { it.startsWith(day) }
+        val seconds = today.values.sumOf { it / 1000L }
+        "apps_scan=" + prefs.getString("scan_status", "never") +
+            " events=" + prefs.getInt("scan_events", 0) +
+            " resumed=" + prefs.getInt("scan_resumed", 0) +
+            " bootstrap=" + prefs.getBoolean("scan_bootstrap", false) +
+            " app_count=" + today.size +
+            " today_seconds=" + seconds +
+            " last_scan_ms=" + prefs.getLong("scan_at", 0L)
+    }
+
+    private fun saveScan(result: String, eventCount: Int, resumedCount: Int,
+                         bootstrap: Boolean) {
+        prefs.edit()
+            .putString("scan_status", result)
+            .putInt("scan_events", eventCount)
+            .putInt("scan_resumed", resumedCount)
+            .putBoolean("scan_bootstrap", bootstrap)
+            .putLong("scan_at", System.currentTimeMillis())
+            .apply()
     }
 
     fun snapshot(): Snapshot = synchronized(LOCK) {
