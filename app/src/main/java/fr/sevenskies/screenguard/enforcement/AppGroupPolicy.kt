@@ -14,8 +14,8 @@ object AppGroupPolicy {
     data class Rule(val kind: String, val value: String, val exclude: Boolean)
     data class Group(
         val id: String, val name: String, val rules: List<Rule>,
-        val builtin: String? = null,
-        val dailyLimits: Map<Int, Int>, val adjustmentToday: Int
+        val dailyLimits: Map<Int, Int>, val adjustmentToday: Int,
+        val builtin: String? = null
     )
     data class Config(
         val groups: List<Group>,
@@ -56,9 +56,9 @@ object AppGroupPolicy {
                 val minutes = limit.optInt("allowed_minutes", -1)
                 if (day in 0..6 && minutes in 0..1440) limits[day] = minutes
             }
-            groups.add(Group(id, obj.optString("name").take(120), rules,
-                obj.optString("builtin").takeIf { it.isNotBlank() }, limits,
-                obj.optInt("adjustment_today", 0).coerceIn(-1440, 1440)))
+            groups.add(Group(id, obj.optString("name").take(120), rules, limits,
+                obj.optInt("adjustment_today", 0).coerceIn(-1440, 1440),
+                obj.optString("builtin").takeIf { it.isNotBlank() }))
         }
         val approval = user.optJSONObject("app_approval")
         fun strings(a: JSONArray?): Set<String> = if (a == null) emptySet() else
