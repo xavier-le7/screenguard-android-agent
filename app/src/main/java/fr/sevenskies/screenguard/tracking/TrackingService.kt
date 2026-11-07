@@ -48,6 +48,16 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     private var running = false
     private var receiverRegistered = false
     private var networkRegistered = false
+    private var dnsStateReceiverRegistered = false
+    private val dnsStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (running && intent?.action == DnsVpnService.ACTION_STATE_CHANGED) {
+                // Version 0.10.18 server only applies capability flags on
+                // the initial authenticated WebSocket hello.
+                client?.refreshCapabilities()
+            }
+        }
+    }
     private lateinit var connectivity: ConnectivityManager
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -149,8 +159,13 @@ class TrackingService : Service(), ScreenGuardClient.Events {
                 store, this, { ledger.usageSnapshot() },
                 { appLedger.snapshot() },
                 { appLedger.foregroundApp() },
-                appPolicies
+                appPolicies,
+                { DnsVpnService.isRunning && DnsVpnService.isOptedIn(this) }
             )
+            registerReceiver(dnsStateReceiver,
+                IntentFilter(DnsVpnService.ACTION_STATE_CHANGED),
+                Context.RECEIVER_NOT_EXPORTED)
+            dnsStateReceiverRegistered = true
             client?.connect()
             // Screen-unlock triggers a refresh even after prolonged Doze.
             registerReceiver(wakeReceiver, IntentFilter().apply {
@@ -286,6 +301,10 @@ class TrackingService : Service(), ScreenGuardClient.Events {
         if (::diagnostics.isInitialized) diagnostics.record(AgentDiagnostics.Event.TRACKING_STOPPED)
         running = false
         handler.removeCallbacks(sample)
+        if (dnsStateReceiverRegistered) {
+            unregisterReceiver(dnsStateReceiver)
+            dnsStateReceiverRegistered = false
+        }
         if (receiverRegistered) {
             unregisterReceiver(wakeReceiver)
             receiverRegistered = false
