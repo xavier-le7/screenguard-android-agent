@@ -41,6 +41,7 @@ import fr.sevenskies.screenguard.enforcement.EnforcementPolicy
 import fr.sevenskies.screenguard.enforcement.SensitiveSettingsPolicy
 import fr.sevenskies.screenguard.enforcement.GuardAccessibilityService
 import fr.sevenskies.screenguard.network.ScreenGuardClient
+import fr.sevenskies.screenguard.usage.AppUsageLedger
 import fr.sevenskies.screenguard.security.ParentPin
 import fr.sevenskies.screenguard.security.ScreenGuardDeviceAdminReceiver
 import fr.sevenskies.screenguard.storage.AgentStore
@@ -683,6 +684,10 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
             appendLine("Réponse quota : ${ago(syncAge)}")
             appendLine("Service suivi : ${state.serviceRunning}")
             appendLine("Dernier relevé : ${ago(sampleAge)}")
+            appendLine("Utilisation applications : " +
+                AppUsageLedger(this@MainActivity).diagnosticSummary())
+            appendLine("Filtrage DNS : " +
+                DnsVpnService.diagnosticSummary(this@MainActivity))
             appendLine("Accès statistiques : $statsAllowed")
             appendLine("Accessibilité : $accessAllowed")
             appendLine("Service accessibilité : ${state.accessibilityServiceConnected}")
