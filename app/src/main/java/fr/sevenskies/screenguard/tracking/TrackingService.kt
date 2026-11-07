@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.net.Uri
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
@@ -229,6 +230,30 @@ class TrackingService : Service(), ScreenGuardClient.Events {
                 state.message = "Message parental reçu : notifications indisponibles."
                 Log.w("ScreenGuardMessage", "Notification unavailable", it)
             }
+        }
+    }
+
+    override fun updateRequested() {
+        handler.post {
+            if (!running) return@post
+            val notifications = getSystemService(NotificationManager::class.java)
+            val channel = "screen_guard_updates"
+            notifications.createNotificationChannel(NotificationChannel(
+                channel, "Mises à jour ScreenGuard", NotificationManager.IMPORTANCE_HIGH
+            ))
+            val destination = Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://github.com/xavier-le7/screenguard-android-agent/releases/latest"))
+            val open = PendingIntent.getActivity(
+                this, 22, destination,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            notifications.notify(2205, Notification.Builder(this, channel)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("Mise à jour de ScreenGuard Android")
+                .setContentText("Une mise à jour a été demandée par le serveur. " +
+                    "Installation manuelle requise sur Android.")
+                .setContentIntent(open)
+                .setAutoCancel(true).build())
         }
     }
 

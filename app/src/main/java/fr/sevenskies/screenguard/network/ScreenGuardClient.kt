@@ -43,6 +43,8 @@ class ScreenGuardClient(
         fun unpaired() {}
         /** Redacted agent-owned events for upstream fetch_logs; never Android system logcat. */
         fun diagnosticLogs(): List<String> = emptyList()
+        /** Upstream update_agent cannot silently install APKs on Android. */
+        fun updateRequested() {}
         /** A message from a parent, delivered only if this agent is online. */
         fun parentMessage(message: ScreenGuardProtocol.ParentMessage) {}
     }
@@ -218,6 +220,9 @@ class ScreenGuardClient(
                             ScreenGuardProtocol.warningThresholds(message)?.let {
                                 events.warningThresholds(it)
                             }
+                        }
+                        "update_agent" -> {
+                            events.updateRequested()
                         }
                         "fetch_logs" -> {
                             // This socket is authenticated with the paired agent token.
