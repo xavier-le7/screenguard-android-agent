@@ -3,7 +3,7 @@
 **Independent, open-source Android child agent for the self-hosted [ScreenGuard server](https://github.com/adambie/screenguard).** This repository is not the official upstream Android application and is not endorsed by the upstream maintainers.
 
 [![Android CI](https://github.com/xavier-le7/screenguard-android-agent/actions/workflows/android-ci.yml/badge.svg)](https://github.com/xavier-le7/screenguard-android-agent/actions/workflows/android-ci.yml)
-[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
+**License:** [GNU AGPL-3.0-or-later](LICENSE)
 
 **Current stable release:** **[v0.10.18](https://github.com/xavier-le7/screenguard-android-agent/releases/tag/v0.10.18)** (Android `versionCode 21`), for ScreenGuard **server v0.10.18**. Requires **Android 14 or later** (minSdk 34).
 
@@ -31,7 +31,7 @@ The project has six locale resource sets (French, English, Spanish, German, Port
 ## Install and pair
 
 1. Install the **[maintainer-signed v0.10.18 APK](https://github.com/xavier-le7/screenguard-android-agent/releases/download/v0.10.18/screenguard-android-agent-v0.10.18.apk)**. Optionally verify the adjacent [SHA-256 file](https://github.com/xavier-le7/screenguard-android-agent/releases/download/v0.10.18/screenguard-android-agent-v0.10.18.apk.sha256).
-2. Use a reachable, trusted **ScreenGuard server v0.10.18 or later**. Enter your own `wss://your-server.example/ws` URL and the child's profile display name; **no server address is preconfigured**.
+2. Use a reachable, trusted **ScreenGuard server v0.10.18 or later**. Enter your own `wss://example.org/ws` URL and the child's profile display name; **no server address is preconfigured**.
 3. Complete the pairing flow and associate the agent's logical user with the desired ScreenGuard profile.
 4. Grant Android **Usage Access** and notifications, then start tracking. Check the device/agent is online and that daily screen time appears in the server.
 5. For app blocking, enable the ScreenGuard **Accessibility** service and the restrictions, and set a six-digit parent PIN. Android may ask you to authorize restricted settings for sideloaded APKs.
