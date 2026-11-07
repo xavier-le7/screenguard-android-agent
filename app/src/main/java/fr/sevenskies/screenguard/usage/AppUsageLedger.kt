@@ -135,7 +135,8 @@ class AppUsageLedger(private val context: Context) {
 
     private fun eligible(pkg: String): Boolean {
         if (pkg == context.packageName || pkg.isBlank()) return false
-        if (pkg.startsWith("com.android.") || pkg == "android" ||
+        if (pkg == "android" || pkg in NON_APPS ||
+            pkg.startsWith("com.android.providers.") ||
             pkg.startsWith("com.google.android.permissioncontroller") ||
             pkg.startsWith("com.samsung.android.settings") ||
             pkg.startsWith("com.sec.android.app.launcher")) return false
@@ -184,6 +185,13 @@ class AppUsageLedger(private val context: Context) {
     companion object {
         private val LOCK = Any()
         private const val MAX_RECORDS = 3000
+        private val NON_APPS = setOf(
+            "com.android.settings", "com.android.systemui",
+            "com.android.permissioncontroller", "com.android.launcher3",
+            "com.android.phone", "com.android.dialer",
+            "com.android.inputmethod.latin", "com.google.android.inputmethod.latin",
+            "com.google.android.apps.nexuslauncher"
+        )
         private val BROWSERS = setOf(
             "com.android.chrome", "org.mozilla.firefox", "org.mozilla.fenix",
             "com.sec.android.app.sbrowser", "com.microsoft.emmx", "com.brave.browser",
