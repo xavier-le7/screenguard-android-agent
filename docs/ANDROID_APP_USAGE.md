@@ -23,3 +23,12 @@ VPN filtering is functional and tested on a device.
 4. Verify blocked-group and exhausted per-app limits apply only to the app, never Android Settings, launchers or emergency apps.
 5. Reboot, reconnect and verify cumulative totals never double-count.
 6. Verify an upgrade from the signed v0.5.3, keeping the same app identity, signing key and paired token.
+
+## App visibility permission
+
+This sideloaded parental-control agent uses `QUERY_ALL_PACKAGES` for accurate
+foreground app labels and `ApplicationInfo.CATEGORY_GAME` classification on
+Android 11+. It does **not** upload an inventory of installed applications.
+Only apps actually active while the unlocked screen is in use are reported,
+using the upstream `app_usage_sync` fields. This permission is restricted by
+Google Play policies if the app is ever distributed through the Play Store.
