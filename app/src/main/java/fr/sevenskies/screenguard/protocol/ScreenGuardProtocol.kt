@@ -49,6 +49,7 @@ object ScreenGuardProtocol {
                 .put("agent_version", versionName)
                 .put("last_config_version", 0)
                 .put("capabilities", JSONArray())
+        )
     }
 
     fun userListUpdate(child: String): String =
