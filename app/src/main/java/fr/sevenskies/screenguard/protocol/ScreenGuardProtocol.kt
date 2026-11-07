@@ -77,7 +77,7 @@ object ScreenGuardProtocol {
      */
     fun logResponse(lines: List<String>): String {
         require(lines.size <= 50) { "Too many diagnostic lines" }
-        require(lines.all { it.length <= 512 && !it.contains('\\n') && !it.contains('\\r') }) {
+        require(lines.all { it.length <= 512 && !it.contains('\n') && !it.contains('\r') }) {
             "Diagnostic lines must be short and single-line"
         }
         val items = JSONArray()

@@ -113,7 +113,7 @@ class ScreenGuardProtocolTest {
             ScreenGuardProtocol.logResponse(List(51) { "entry" })
         }
         assertThrows(IllegalArgumentException::class.java) {
-            ScreenGuardProtocol.logResponse(listOf("forbidden\\nline"))
+            ScreenGuardProtocol.logResponse(listOf("forbidden\nline"))
         }
         assertThrows(IllegalArgumentException::class.java) {
             ScreenGuardProtocol.logResponse(listOf("x".repeat(513)))
