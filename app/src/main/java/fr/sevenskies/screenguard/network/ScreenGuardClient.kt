@@ -29,7 +29,8 @@ class ScreenGuardClient(
     private val usageSnapshot: (() -> Map<String, Long>)? = null,
     private val appUsageSnapshot: (() -> AppUsageLedger.Snapshot)? = null,
     private val currentForeground: (() -> AppGroupPolicy.App?)? = null,
-    private val policyStore: AppPolicyStore? = null
+    private val policyStore: AppPolicyStore? = null,
+    private val webFilterRunning: (() -> Boolean)? = null
 ) {
     interface Events {
         fun status(text: String)
@@ -148,6 +149,21 @@ class ScreenGuardClient(
         }
     }
 
+    /**
+     * ScreenGuard 0.10.18 persists 'web_filter_available' from agent_hello
+     * ONLY on initial WebSocket connection. A subsequent agent_hello on the
+     * same socket updates version but NOT capabilities. Force an authenticated
+     * reconnect whenever our VPN starts/stops.
+     */
+    fun refreshCapabilities() {
+        if (closed) return
+        scheduler.execute {
+            if (closed || store.loadToken() == null) return@execute
+            reconnectTask?.cancel(false)
+            connectSocket()
+        }
+    }
+
     private fun connectSocket() {
         if (closed) return
         val token = store.loadToken()
@@ -176,7 +192,13 @@ class ScreenGuardClient(
                 webSocket.send(ScreenGuardProtocol.agentHello(
                     store.machineId, hostname(), TimeZone.getDefault().id,
                     BuildConfig.VERSION_NAME,
-                    if (appUsageSnapshot != null) listOf("app_usage") else emptyList()
+                    buildList {
+                        if (appUsageSnapshot != null) add("app_usage")
+                        // The server's only web-filter indication is its
+                        // availability badge. Reflect *running* DNS VPN only;
+                        // this does not imply DoH/DoT bypass resistance.
+                        if (webFilterRunning?.invoke() == true) add("web_filter")
+                    }
                 ))
                 webSocket.send(ScreenGuardProtocol.userListUpdate(store.child))
                 sendQuotaSnapshot(webSocket)
