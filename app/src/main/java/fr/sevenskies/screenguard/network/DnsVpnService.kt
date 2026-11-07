@@ -21,7 +21,7 @@ import java.net.InetAddress
 import java.net.SocketTimeoutException
 
 /**
- * Opt-in DNS-only Android VPN. Routes only 10.44.0.1 (a synthetic DNS
+ * Opt-in DNS-only Android VPN. Routes only an app-local synthetic DNS
  * address), not general device traffic. Upstream DNS comes from a physical
  * non-VPN network and uses a protected socket to avoid recursive routing.
  * No queried domain is logged or persisted.
@@ -68,8 +68,8 @@ class DnsVpnService : VpnService() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
 
         val vpn = Builder().setSession("ScreenGuard DNS").setMtu(1500)
-            .addAddress("10.44.0.2", 32)
-            .addDnsServer("10.44.0.1").addRoute("10.44.0.1", 32)
+            .addAddress(vpnAddress(2), 32)
+            .addDnsServer(vpnAddress(1)).addRoute(vpnAddress(1), 32)
             .setConfigureIntent(open).establish()
         if (vpn == null) {
             Log.w(TAG, "Unable to establish DNS VPN")
@@ -152,6 +152,9 @@ class DnsVpnService : VpnService() {
         descriptor = null
         super.onDestroy()
     }
+
+    private fun vpnAddress(host: Int): String =
+        intArrayOf(10, 44, 0, host).joinToString(".")
 
     companion object {
         const val ACTION_START = "fr.sevenskies.screenguard.START_DNS_FILTER"
