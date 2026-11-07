@@ -22,8 +22,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BASE='https://github.com/xavier-le7/screenguard-android-agent/releases/download/v0.5.3'
-          NAME='screenguard-android-agent-v0.5.3.apk'
+          BASE='https://github.com/xavier-le7/screenguard-android-agent/releases/download/v0.10.18'
+          NAME='screenguard-android-agent-v0.10.18.apk'
           curl --fail --silent --show-error --location --retry 3 --max-time 90 \
             "$BASE/$NAME" --output "$NAME"
           curl --fail --silent --show-error --location --retry 3 --max-time 90 \
@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE='ghcr.io/xavier-le7/screenguard-android-agent-apk:v0.5.3'
+          IMAGE='ghcr.io/xavier-le7/screenguard-android-agent-apk:v0.10.18'
           if ! docker pull "$IMAGE"; then
             echo '::error::Cannot pull GHCR package anonymously. It may be private. Set package visibility to Public.'
             exit 1
@@ -42,7 +42,7 @@ jobs:
           CID="$(docker create "$IMAGE" /bin/true)"
           trap 'docker rm -f "$CID" >/dev/null 2>&1 || true' EXIT
           docker cp "$CID:/screenguard-android-agent.apk" ghcr-release.apk
-          RELEASE_DIGEST="$(sha256sum screenguard-android-agent-v0.5.3.apk | cut -d ' ' -f 1)"
+          RELEASE_DIGEST="$(sha256sum screenguard-android-agent-v0.10.18.apk | cut -d ' ' -f 1)"
           GHCR_DIGEST="$(sha256sum ghcr-release.apk | cut -d ' ' -f 1)"
           if [[ "$RELEASE_DIGEST" != "$GHCR_DIGEST" ]]; then
             echo "::error::GHCR package and Release assets are not bitwise identical."

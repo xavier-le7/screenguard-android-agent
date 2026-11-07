@@ -1,0 +1,39 @@
+name: Sync official v0.10.18 release notes (one time)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/sync-v01018-release-notes.yml
+
+permissions:
+  contents: read
+
+jobs:
+  update-notes:
+    if: github.repository == 'xavier-le7/screenguard-android-agent'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update existing release notes only, never its signed assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test -s docs/releases/v0.10.18.md
+          gh release view v0.10.18 --json isDraft --jq '.isDraft' | grep -Fx false
+          mkdir -p "$RUNNER_TEMP/release-check"
+          gh release download v0.10.18 \
+            --pattern 'screenguard-android-agent-v0.10.18.apk.sha256' \
+            --dir "$RUNNER_TEMP/release-check"
+          HASH="$(awk '{print $1}' "$RUNNER_TEMP/release-check/screenguard-android-agent-v0.10.18.apk.sha256")"
+          [[ "$HASH" =~ ^[0-9a-f]{64}$ ]]
+          cp docs/releases/v0.10.18.md "$RUNNER_TEMP/notes.md"
+          printf '\n### Verification\n\n- Android versionCode: 21\n- APK SHA-256: %s\n- Signed non-debuggable release, verified by Android CI\n' "$HASH" >> "$RUNNER_TEMP/notes.md"
+          gh release edit v0.10.18 --notes-file "$RUNNER_TEMP/notes.md"
+          gh release view v0.10.18 --json body --jq '.body' | grep -q 'official release'
+          echo 'Finalized verified official release notes; APK assets unchanged.'
