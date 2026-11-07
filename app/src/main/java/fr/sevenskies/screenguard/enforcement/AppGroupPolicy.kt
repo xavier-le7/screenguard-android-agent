@@ -5,7 +5,7 @@ import org.json.JSONObject
 import java.time.LocalDate
 
 /**
- * ScreenGuard 0.10.18 policy model. Pure Kotlin; not yet activated on-device.
+ * ScreenGuard 0.10.18 policy model used by Android app usage and Accessibility enforcement.
  * Upstream accepts desktop:/flatpak:/snap:/steam:/minecraft:/wine:/exe: AppIds,
  * not android:. We map Android package names to desktop:android.<package>.
  */

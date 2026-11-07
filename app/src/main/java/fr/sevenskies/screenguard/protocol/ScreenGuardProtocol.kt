@@ -70,12 +70,6 @@ object ScreenGuardProtocol {
         )
 
     /**
-     * The server v0.10.17 calculates remaining time ONLY for heartbeat.users.
-     * An empty list yields remaining_update.users=[], even for linked profiles.
-     * Declare our stable logical user with ZERO active seconds in this phase:
-     * it requests the quota without falsely consuming screen time.
-     */
-    /**
      * Upstream ScreenGuard v0.10.18 fetch_logs -> log_response {lines}.
      * Caller must supply only sanitized, application-owned diagnostics.
      * The server expects at most 50 short lines in a 5-second request window.
@@ -90,6 +84,11 @@ object ScreenGuardProtocol {
         return envelope("log_response", JSONObject().put("lines", items))
     }
 
+    /**
+     * The server calculates remaining time for heartbeat.users, but adds
+     * active_seconds_since_last. Use our linked UID with a ZERO delta:
+     * cumulative usage_sync already accounts for all screen time.
+     */
     fun quotaHeartbeat(): String =
         envelope(
             "heartbeat",
@@ -107,7 +106,7 @@ object ScreenGuardProtocol {
 
     /**
      * Per-device cumulative seconds for each local date, NOT an additive
-     * heartbeat delta. Server v0.10.17 stores MAX(old, snapshot) for each
+     * heartbeat delta. Server v0.10.18 stores MAX(old, snapshot) for each
      * agent_user_id/date; retransmission is therefore safe.
      */
     data class AppUsage(
@@ -163,7 +162,7 @@ object ScreenGuardProtocol {
     }
 
     /**
-     * Server v0.10.17 NotifyUser: local_uid, summary, body.
+     * Server v0.10.18 NotifyUser: local_uid, summary, body.
      * Server sends one event per linked local user (no queue / reply).
      * Never display messages directed at a different Android agent user.
      */
@@ -221,7 +220,7 @@ object ScreenGuardProtocol {
     }
 
     /**
-     * v0.10.17 sends JSON application-level "pong" with payload:null when the
+     * v0.10.18 sends JSON application-level "pong" with payload:null when the
      * WebSocket transport receives a PING. Do not require a JSONObject for it.
      */
     fun parse(text: String): Incoming {

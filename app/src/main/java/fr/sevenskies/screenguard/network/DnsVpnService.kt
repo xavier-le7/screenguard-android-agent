@@ -23,12 +23,14 @@ import java.net.SocketTimeoutException
 
 /**
  * Opt-in DNS-only Android VPN. Routes only an app-local synthetic DNS
- * address), not general device traffic. Upstream DNS comes from a physical
+ * address, not general device traffic. Upstream DNS comes from a physical
  * non-VPN network and uses a protected socket to avoid recursive routing.
  * No queried domain is logged or persisted.
  *
- * Does NOT yet block DoH/DoT, IPv6 DNS or concurrent VPN bypasses; therefore
- * the Android agent does not advertise the upstream web_filter capability.
+ * Does NOT block DoH/DoT, some IPv6 DNS paths or competing VPN bypasses.
+ * The agent advertises the server's web_filter availability badge only
+ * while this limited DNS VPN is running with parent opt-in. That badge is
+ * not a guarantee of comprehensive website filtering.
  */
 class DnsVpnService : VpnService() {
     private var descriptor: ParcelFileDescriptor? = null

@@ -54,7 +54,7 @@ class ScreenGuardClient(
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        // Phase 1 no longer needs its workaround: pong payload:null is handled.
+        // The parser accepts an application-level pong with payload:null.
         // Transport pings reveal half-open sockets after Samsung Doze.
         .pingInterval(60, TimeUnit.SECONDS)
         .build()
