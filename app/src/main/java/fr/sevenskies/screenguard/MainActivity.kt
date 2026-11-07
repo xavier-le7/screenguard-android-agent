@@ -70,6 +70,7 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
     private lateinit var trackingHealth: TextView
     private lateinit var guardHealth: TextView
     private lateinit var settingsHealth: TextView
+    private lateinit var dnsHealth: TextView
     private lateinit var infoNotice: TextView
     private lateinit var setupPanel: LinearLayout
     private lateinit var controlPanel: LinearLayout
@@ -249,6 +250,7 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
         trackingHealth = healthRow(c, "Suivi du temps")
         guardHealth = healthRow(c, "Blocage des applications")
         settingsHealth = healthRow(c, "Réglages sensibles")
+        dnsHealth = healthRow(c, "Filtrage DNS")
         root.addView(c, full(-2))
     }
 
@@ -692,6 +694,13 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
                 !parentalSettingsOpen,
             if (state.settingsGuardEnabled && adminIsActive() && guardOk &&
                 !parentalSettingsOpen) GREEN else AMBER)
+        val vpnRunning = DnsVpnService.isRunning && DnsVpnService.isOptedIn(this)
+        health(dnsHealth, when {
+            vpnRunning -> "● Actif (DNS)"
+            DnsVpnService.isRunning -> "● Arrêt en cours"
+            DnsVpnService.isOptedIn(this) -> "● Démarrage requis"
+            else -> "● Désactivé"
+        }, vpnRunning, if (vpnRunning) GREEN else AMBER)
 
         setupText.text = loc(if (paired)
             "✓ Appareil lié au profil ${store.child}. Aucun nouvel appairage nécessaire."
