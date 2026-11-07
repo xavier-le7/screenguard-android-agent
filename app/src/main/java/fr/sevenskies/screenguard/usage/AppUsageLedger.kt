@@ -84,8 +84,7 @@ class AppUsageLedger(private val context: Context) {
             }
         }
         credit(now)
-        val appNow = info(foreground ?: "")
-        val next = if (eligible(appNow.id.removePrefix("desktop:android."))) foreground else null
+        val next = foreground?.takeIf(::eligible)
         checkpoint(now, anchor, next, power.isInteractive,
             !keyguard.isKeyguardLocked, apps, groups)
         true
@@ -107,6 +106,13 @@ class AppUsageLedger(private val context: Context) {
                 if (parts.size != 2 || millis < 1000L) null else GroupTotal(parts[0], parts[1], millis / 1000L)
             }.sortedWith(compareBy({ it.date }, { it.groupId })).take(MAX_RECORDS).toList()
         )
+    }
+
+    /** The last active package, for an unknown-app approval request. */
+    fun foregroundApp(): AppGroupPolicy.App? = synchronized(LOCK) {
+        if (!power.isInteractive || keyguard.isKeyguardLocked) return@synchronized null
+        val pkg = prefs.getString("foreground", null) ?: return@synchronized null
+        if (!eligible(pkg)) null else info(pkg)
     }
 
     fun todayGroupSeconds(): Map<String, Long> = synchronized(LOCK) {
