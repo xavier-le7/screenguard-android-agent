@@ -694,7 +694,7 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
                 !parentalSettingsOpen,
             if (state.settingsGuardEnabled && adminIsActive() && guardOk &&
                 !parentalSettingsOpen) GREEN else AMBER)
-        val vpnRunning = DnsVpnService.isRunning && DnsVpnService.isOptedIn(this)
+        val vpnRunning = DnsVpnService.isActive(this)
         health(dnsHealth, when {
             vpnRunning -> "● Actif (DNS)"
             DnsVpnService.isRunning -> "● Arrêt en cours"

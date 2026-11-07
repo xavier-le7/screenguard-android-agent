@@ -160,7 +160,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
                 { appLedger.snapshot() },
                 { appLedger.foregroundApp() },
                 appPolicies,
-                { DnsVpnService.isRunning && DnsVpnService.isOptedIn(this) }
+                { DnsVpnService.isActive(this) }
             )
             registerReceiver(dnsStateReceiver,
                 IntentFilter(DnsVpnService.ACTION_STATE_CHANGED),

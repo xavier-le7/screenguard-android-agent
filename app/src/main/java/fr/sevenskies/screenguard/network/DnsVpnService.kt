@@ -268,15 +268,11 @@ class DnsVpnService : VpnService() {
                 .edit().putBoolean("enabled", false).commit()
         }
 
-        fun status(context: Context): String {
-            val optedIn = isOptedIn(context)
-            return when {
-                isRunning && optedIn -> "ACTIF — VPN DNS connecté"
-                isRunning -> "Arrêt du VPN en cours"
-                optedIn -> "Activation demandée — VPN inactif"
-                else -> "INACTIF"
-            }
-        }
+        fun isActive(context: Context): Boolean =
+            DnsFilterState.isActive(isOptedIn(context), isRunning)
+
+        fun status(context: Context): String =
+            DnsFilterState.label(DnsFilterState.mode(isOptedIn(context), isRunning))
         @Volatile var isRunning = false
             private set
         private const val TAG = "ScreenGuardDns"
