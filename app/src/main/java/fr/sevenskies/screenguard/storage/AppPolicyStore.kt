@@ -2,6 +2,7 @@ package fr.sevenskies.screenguard.storage
 
 import android.content.Context
 import fr.sevenskies.screenguard.enforcement.AppGroupPolicy
+import org.json.JSONArray
 import fr.sevenskies.screenguard.protocol.ScreenGuardProtocol
 import org.json.JSONObject
 import java.time.LocalDate
@@ -38,6 +39,13 @@ class AppPolicyStore(context: Context) {
             if (user.optInt("local_uid", -1) == ScreenGuardProtocol.LOCAL_UID) {
                 check(prefs.edit().putString("user_config", user.toString())
                     .putLong("config_received_at", System.currentTimeMillis()).commit())
+                val config = AppGroupPolicy.fromUserConfig(user)
+                // Keep queued requests until the server confirms a decision.
+                val outstanding = pendingRequests().filter {
+                    config.approved != null &&
+                        it.id !in config.approved && it.id !in config.denied
+                }
+                saveRequests(outstanding)
                 return
             }
         }
@@ -69,6 +77,43 @@ class AppPolicyStore(context: Context) {
         val raw = runCatching { JSONObject(prefs.getString("elsewhere", "{}")) }
             .getOrDefault(JSONObject())
         return raw.keys().asSequence().associateWith { raw.optLong(it, 0L).coerceAtLeast(0L) }
+    }
+
+    /**
+     * Accessibility may block an app before the network timer runs, so persist
+     * approval requests even if the child immediately leaves that app.
+     */
+    @Synchronized fun queueApproval(app: AppGroupPolicy.App) {
+        if (app.id.isBlank() || config()?.approved == null) return
+        val old = pendingRequests()
+        if (old.any { it.id == app.id } || old.size >= 50) return
+        saveRequests(old + app)
+    }
+
+    @Synchronized fun pendingRequests(): List<AppGroupPolicy.App> {
+        val raw = runCatching { JSONArray(prefs.getString("requests", "[]")) }
+            .getOrDefault(JSONArray())
+        return (0 until minOf(raw.length(), 50)).mapNotNull { i ->
+            val item = raw.optJSONObject(i) ?: return@mapNotNull null
+            val id = item.optString("id")
+            if (id.isBlank() || id.length > 255) return@mapNotNull null
+            val categories = item.optJSONArray("categories") ?: JSONArray()
+            AppGroupPolicy.App(id, item.optString("name").take(128),
+                (0 until categories.length()).map { categories.optString(it) }
+                    .filter { it.isNotBlank() }.take(12))
+        }
+    }
+
+    private fun saveRequests(requests: List<AppGroupPolicy.App>) {
+        val result = JSONArray()
+        for (app in requests.take(50)) {
+            result.put(JSONObject().put("id", app.id)
+                .put("name", app.displayName.take(128))
+                .put("categories", JSONArray().apply {
+                    app.categories.take(12).forEach { put(it) }
+                }))
+        }
+        check(prefs.edit().putString("requests", result.toString()).commit())
     }
 
     fun clear() { check(prefs.edit().clear().commit()) }
