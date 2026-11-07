@@ -307,12 +307,14 @@ class ScreenGuardClient(
             val config = policyStore?.config()
             val foreground = currentForeground?.invoke()
             if (config != null && foreground != null && foreground.id.isNotBlank() &&
-                !requestedApps.contains(foreground.id)) {
-                val result = AppGroupPolicy.decide(config, foreground, emptyMap(), emptyMap())
-                if (result.needsApproval &&
+                AppGroupPolicy.decide(config, foreground, emptyMap(), emptyMap()).needsApproval) {
+                policyStore.queueApproval(foreground)
+            }
+            policyStore?.pendingRequests()?.forEach { pending ->
+                if (pending.id !in requestedApps &&
                     ws.send(ScreenGuardProtocol.appRequest(
-                        foreground.id, foreground.displayName, foreground.categories))) {
-                    requestedApps.add(foreground.id)
+                        pending.id, pending.displayName, pending.categories))) {
+                    requestedApps.add(pending.id)
                 }
             }
         }

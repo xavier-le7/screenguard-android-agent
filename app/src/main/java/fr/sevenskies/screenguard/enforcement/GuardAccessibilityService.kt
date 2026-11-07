@@ -229,6 +229,10 @@ class GuardAccessibilityService : AccessibilityService() {
                 else null
             } else null
         } else null
+        if (appPolicy?.needsApproval == true) {
+            val app = appLedger.info(pkg)
+            if (app.id.isNotBlank()) appPolicies.queueApproval(app)
+        }
         val appDenied = appPolicy?.blocked == true
         // Linux can terminate a process; Android cannot terminate arbitrary apps.
         // Give an exhausted time-limit 10 seconds, then cover only that app

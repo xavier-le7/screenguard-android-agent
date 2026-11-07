@@ -93,6 +93,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
                 }.onFailure {
                     Log.w("ScreenGuardApps", "App usage sample unavailable", it)
                 }
+                if (appPolicies.pendingRequests().isNotEmpty()) client?.refreshConnection()
             }
             if (running) {
                 ProtectionHealthReporter.check(this@TrackingService, state, ledger.hasPermission())
