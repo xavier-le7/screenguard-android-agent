@@ -91,9 +91,9 @@ object AppGroupPolicy {
             app.id !in config.approved && app.id !in config.denied
         val denied = config.approved != null && app.id in config.denied
         val minutes = group?.dailyLimits?.get(today.dayOfWeek.value - 1)
-        val secondsRemaining = minutes?.let { limit ->
-            if (limit == 0) 0L else (
-                (limit + group.adjustmentToday).coerceAtLeast(0).toLong() * 60L -
+        val secondsRemaining = if (group == null || minutes == null) null else {
+            if (minutes == 0) 0L else (
+                (minutes + group.adjustmentToday).coerceAtLeast(0).toLong() * 60L -
                     (localGroupSeconds[group.id] ?: 0L).coerceAtLeast(0L) -
                     (elsewhereSeconds[group.id] ?: 0L).coerceAtLeast(0L)
             ).coerceAtLeast(0L)
