@@ -18,7 +18,7 @@ jobs:
       - name: Checkout pinned reviewed feature code
         uses: actions/checkout@v4
         with:
-          ref: d28533c585dd1d152472cbff02ff6fb040c75a8f
+          ref: 70e4da6936eb1866a82a55e4ab65e4902f7ed884
           persist-credentials: false
       - name: Source privacy
         run: python3 scripts/check-public-snapshot.py
@@ -77,17 +77,17 @@ jobs:
                <(grep 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/release.txt")
           BADGING="$("$AAPT" dump badging "$RELEASE")"
           grep -F "name='fr.sevenskies.screenguard.agent'" <<< "$BADGING" >/dev/null
-          grep -F "versionCode='20'" <<< "$BADGING" >/dev/null
+          grep -F "versionCode='21'" <<< "$BADGING" >/dev/null
           grep -F "versionName='0.10.18'" <<< "$BADGING" >/dev/null
           if grep -q '^application-debuggable' <<< "$BADGING"; then exit 1; fi
           mkdir -p dist
-          cp "$RELEASE" dist/screenguard-android-agent-v0.10.18-TEST2.apk
-          (cd dist && sha256sum screenguard-android-agent-v0.10.18-TEST2.apk > screenguard-android-agent-v0.10.18-TEST2.apk.sha256)
+          cp "$RELEASE" dist/screenguard-android-agent-v0.10.18-TEST3.apk
+          (cd dist && sha256sum screenguard-android-agent-v0.10.18-TEST3.apk > screenguard-android-agent-v0.10.18-TEST3.apk.sha256)
           echo "Verified Android TEST candidate. Nothing was published to Releases or GHCR."
       - name: Archive signed test APK
         uses: actions/upload-artifact@v4
         with:
-          name: screenguard-android-agent-v0.10.18-TEST2-signed
+          name: screenguard-android-agent-v0.10.18-TEST3-signed
           path: dist/
           if-no-files-found: error
           retention-days: 14
