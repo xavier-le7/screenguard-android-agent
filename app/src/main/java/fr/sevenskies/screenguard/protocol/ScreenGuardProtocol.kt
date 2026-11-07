@@ -6,7 +6,7 @@ import java.security.SecureRandom
 import java.time.Instant
 
 /**
- * JSON wire contract checked against upstream adambie/screenguard v0.10.17:
+ * JSON wire contract checked against upstream adambie/screenguard v0.10.18:
  * crates/common/src/{protocol,messages,models}.rs.
  * No server changes or custom message types are permitted.
  */
@@ -70,6 +70,21 @@ object ScreenGuardProtocol {
      * Declare our stable logical user with ZERO active seconds in this phase:
      * it requests the quota without falsely consuming screen time.
      */
+    /**
+     * Upstream ScreenGuard v0.10.18 fetch_logs -> log_response {lines}.
+     * Caller must supply only sanitized, application-owned diagnostics.
+     * The server expects at most 50 short lines in a 5-second request window.
+     */
+    fun logResponse(lines: List<String>): String {
+        require(lines.size <= 50) { "Too many diagnostic lines" }
+        require(lines.all { it.length <= 512 && !it.contains('\\n') && !it.contains('\\r') }) {
+            "Diagnostic lines must be short and single-line"
+        }
+        val items = JSONArray()
+        lines.forEach { items.put(it) }
+        return envelope("log_response", JSONObject().put("lines", items))
+    }
+
     fun quotaHeartbeat(): String =
         envelope(
             "heartbeat",

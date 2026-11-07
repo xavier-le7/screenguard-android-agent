@@ -29,6 +29,7 @@ import fr.sevenskies.screenguard.i18n.ScreenGuardI18n
 import fr.sevenskies.screenguard.storage.AgentStore
 import fr.sevenskies.screenguard.storage.TrackingStatus
 import fr.sevenskies.screenguard.security.ParentPin
+import fr.sevenskies.screenguard.tracking.AgentDiagnostics
 import fr.sevenskies.screenguard.tracking.ProtectionHealthReporter
 import fr.sevenskies.screenguard.usage.UsageLedger
 
@@ -68,6 +69,7 @@ class GuardAccessibilityService : AccessibilityService() {
         ledger = UsageLedger(this)
         parentPin = ParentPin(this)
         state.accessibilityServiceConnected = true
+        AgentDiagnostics(this).record(AgentDiagnostics.Event.ACCESSIBILITY_CONNECTED)
         Log.i("ScreenGuardGuard", "Accessibility service connected")
         windows = getSystemService(WindowManager::class.java)
         power = getSystemService(PowerManager::class.java)
@@ -483,6 +485,7 @@ class GuardAccessibilityService : AccessibilityService() {
     override fun onInterrupt() { hideOverlay() }
 
     override fun onDestroy() {
+        AgentDiagnostics(this).record(AgentDiagnostics.Event.ACCESSIBILITY_STOPPED)
         if (::state.isInitialized) {
             state.accessibilityServiceConnected = false
             state.lastGuardReason = "Service d'accessibilité arrêté"

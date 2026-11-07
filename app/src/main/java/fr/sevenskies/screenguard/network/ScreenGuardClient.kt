@@ -15,7 +15,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 /**
- * Compatible only with upstream ScreenGuard v0.10.17.
+ * Compatible with upstream ScreenGuard v0.10.18 (backward-compatible messages).
  * Usage snapshots are cumulative (server MAX reconciliation); heartbeat
  * ALWAYS reports zero active seconds to prevent a separate additive charge.
  */
@@ -34,6 +34,8 @@ class ScreenGuardClient(
         fun warningThresholds(values: List<Int>) {}
         fun immediateLock() {}
         fun unpaired() {}
+        /** Redacted agent-owned events for upstream fetch_logs; never Android system logcat. */
+        fun diagnosticLogs(): List<String> = emptyList()
         /** A message from a parent, delivered only if this agent is online. */
         fun parentMessage(message: ScreenGuardProtocol.ParentMessage) {}
     }
@@ -201,6 +203,14 @@ class ScreenGuardClient(
                         "config_push" -> {
                             ScreenGuardProtocol.warningThresholds(message)?.let {
                                 events.warningThresholds(it)
+                            }
+                        }
+                        "fetch_logs" -> {
+                            // This socket is authenticated with the paired agent token.
+                            // No arbitrary file reads, system logcat or remote commands.
+                            val lines = events.diagnosticLogs()
+                            check(webSocket.send(ScreenGuardProtocol.logResponse(lines))) {
+                                "Unable to queue log_response"
                             }
                         }
                         "config_reload" -> {

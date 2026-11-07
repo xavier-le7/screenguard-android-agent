@@ -35,6 +35,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     private lateinit var store: AgentStore
     private lateinit var state: TrackingStatus
     private lateinit var ledger: UsageLedger
+    private lateinit var diagnostics: AgentDiagnostics
     private var client: ScreenGuardClient? = null
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
@@ -91,6 +92,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
         store = AgentStore(this)
         state = TrackingStatus(this)
         ledger = UsageLedger(this)
+        diagnostics = AgentDiagnostics(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -114,6 +116,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
             running = true
             state.trackingEnabled = true
             state.serviceRunning = true
+            diagnostics.record(AgentDiagnostics.Event.TRACKING_STARTED)
             state.message = "Suivi démarré. Connexion au serveur..."
             runCatching {
                 if (ledger.collect()) {
@@ -143,6 +146,18 @@ class TrackingService : Service(), ScreenGuardClient.Events {
 
     override fun status(text: String) {
         state.message = text
+        // Never write the raw status: it can contain a hostname or error detail.
+        when {
+            text == "Serveur connecté — synchronisation active." ->
+                diagnostics.record(AgentDiagnostics.Event.NETWORK_CONNECTED)
+            text.startsWith("Hors ligne") || text.startsWith("Connexion interrompue") ->
+                diagnostics.record(AgentDiagnostics.Event.NETWORK_INTERRUPTED)
+        }
+    }
+
+    override fun diagnosticLogs(): List<String> {
+        diagnostics.record(AgentDiagnostics.Event.FETCH_LOGS_REQUESTED)
+        return diagnostics.snapshot(state, ledger.hasPermission())
     }
 
     override fun remaining(minutes: Int, enforce: String) {
@@ -154,6 +169,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
 
     override fun policy(decision: fr.sevenskies.screenguard.protocol.ScreenGuardProtocol.RemainingDecision) {
         state.updateFromServer(decision, ledger.todaySeconds())
+        // Do not record high-frequency quota updates in the persistent ring.
         Log.i("ScreenGuardSync", "server policy=" + decision.enforce +
             " remaining_min=" + decision.minutes + " local_seconds=" + ledger.todaySeconds())
         state.message = "Serveur actif — décision : " + decision.enforce
@@ -165,6 +181,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     }
 
     override fun immediateLock() {
+        diagnostics.record(AgentDiagnostics.Event.LOCK_REQUESTED)
         state.updateFromServer(
             fr.sevenskies.screenguard.protocol.ScreenGuardProtocol.RemainingDecision(
                 0, "lock", null
@@ -179,6 +196,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     ) {
         handler.post {
             if (!running) return@post
+            diagnostics.record(AgentDiagnostics.Event.PARENT_NOTIFICATION_RECEIVED)
             runCatching {
                 val delivered = ParentMessageNotifier.show(this, message)
                 state.message = if (delivered)
@@ -193,6 +211,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     }
 
     override fun unpaired() {
+        diagnostics.record(AgentDiagnostics.Event.AGENT_UNPAIRED)
         state.restrictionsEnabled = false
         state.trackingEnabled = false
         stopSelf()
@@ -201,6 +220,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     override fun paired() { /* Pairing happens in the parent bootstrap UI. */ }
 
     override fun onDestroy() {
+        if (::diagnostics.isInitialized) diagnostics.record(AgentDiagnostics.Event.TRACKING_STOPPED)
         running = false
         handler.removeCallbacks(sample)
         if (receiverRegistered) {

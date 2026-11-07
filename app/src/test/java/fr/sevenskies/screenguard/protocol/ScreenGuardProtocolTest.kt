@@ -97,6 +97,33 @@ class ScreenGuardProtocolTest {
             .getJSONObject(0).getInt("active_seconds_since_last"))
     }
 
+    @Test fun remoteLogsResponseUsesUpstreamEnvelope() {
+        val response = JSONObject(ScreenGuardProtocol.logResponse(listOf(
+            "2026-11-07T12:00:00Z tracking_started",
+            "2026-11-07T12:01:00Z health tracking=true"
+        )))
+        assertEquals("log_response", response.getString("type"))
+        val lines = response.getJSONObject("payload").getJSONArray("lines")
+        assertEquals(2, lines.length())
+        assertEquals("2026-11-07T12:00:00Z tracking_started", lines.getString(0))
+    }
+
+    @Test fun remoteLogsAreBoundedAndSingleLine() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ScreenGuardProtocol.logResponse(List(51) { "entry" })
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ScreenGuardProtocol.logResponse(listOf("forbidden\\nline"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ScreenGuardProtocol.logResponse(listOf("x".repeat(513)))
+        }
+        val request = ScreenGuardProtocol.parse(
+            ScreenGuardProtocol.envelope("fetch_logs", JSONObject())
+        )
+        assertEquals("fetch_logs", request.type)
+    }
+
     @Test fun pairingCodeHasExpectedAlphabet() {
         repeat(100) {
             val code = ScreenGuardProtocol.newPairingCode()
