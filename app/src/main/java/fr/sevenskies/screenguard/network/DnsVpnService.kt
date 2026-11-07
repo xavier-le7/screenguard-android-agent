@@ -53,8 +53,11 @@ class DnsVpnService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            // Explicit stop, regardless of stale volatile isRunning. The UI
+            // must be able to stop a VPN that Android has restarted itself.
             setOptedIn(false)
-            stopSelf()
+            shutdownVpn("parent_stop")
+            stopSelfResult(startId)
             return START_NOT_STICKY
         }
         if (intent?.action != ACTION_START && intent != null) return START_NOT_STICKY
@@ -102,6 +105,7 @@ class DnsVpnService : VpnService() {
         setOptedIn(true)
         enabled = true
         isRunning = true
+        notifyTrackingStateChanged()
         Thread({ process(vpn) }, "ScreenGuardDnsTunnel").start()
     }
 
@@ -150,9 +154,9 @@ class DnsVpnService : VpnService() {
                 Log.w(TAG, "DNS tunnel stopped: " + e.javaClass.simpleName)
             }
         } finally {
-            enabled = false
-            isRunning = false
-            runCatching { vpn.close() }
+            // Only this service's reader owns the TUN descriptor. A parent
+            // stop closes it immediately to unblock read().
+            shutdownVpn("vpn_loop_stopped")
             stopSelf()
         }
     }
@@ -196,20 +200,34 @@ class DnsVpnService : VpnService() {
         }
     }
 
-    override fun onRevoke() {
-        setOptedIn(false)
+    private fun shutdownVpn(reason: String) {
+        val wasActive = isRunning || enabled || descriptor != null
         enabled = false
         isRunning = false
-        runCatching { descriptor?.close() }
+        val fd = descriptor
+        descriptor = null
+        runCatching { fd?.close() }
+        if (wasActive) {
+            recordError(reason)
+            notifyTrackingStateChanged()
+        }
+    }
+
+    private fun notifyTrackingStateChanged() {
+        // Intra-app broadcast: notify the already-running tracking agent to
+        // reconnect, since the server only updates capabilities on WS hello.
+        sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName))
+    }
+
+    override fun onRevoke() {
+        setOptedIn(false)
+        shutdownVpn("vpn_permission_revoked")
         stopSelf()
         super.onRevoke()
     }
 
     override fun onDestroy() {
-        enabled = false
-        isRunning = false
-        runCatching { descriptor?.close() }
-        descriptor = null
+        shutdownVpn("service_destroyed")
         super.onDestroy()
     }
 
@@ -242,6 +260,23 @@ class DnsVpnService : VpnService() {
                 .getBoolean("enabled", false)
         const val ACTION_START = "fr.sevenskies.screenguard.START_DNS_FILTER"
         const val ACTION_STOP = "fr.sevenskies.screenguard.STOP_DNS_FILTER"
+        const val ACTION_STATE_CHANGED = "fr.sevenskies.screenguard.DNS_FILTER_STATE_CHANGED"
+
+        /** Persist the parent's choice before requesting shutdown. */
+        fun requestStop(context: Context) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putBoolean("enabled", false).commit()
+        }
+
+        fun status(context: Context): String {
+            val optedIn = isOptedIn(context)
+            return when {
+                isRunning && optedIn -> "ACTIF — VPN DNS connecté"
+                isRunning -> "Arrêt du VPN en cours"
+                optedIn -> "Activation demandée — VPN inactif"
+                else -> "INACTIF"
+            }
+        }
         @Volatile var isRunning = false
             private set
         private const val TAG = "ScreenGuardDns"
