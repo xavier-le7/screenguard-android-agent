@@ -25,10 +25,14 @@ import android.widget.EditText
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import fr.sevenskies.screenguard.i18n.ScreenGuardI18n
 import fr.sevenskies.screenguard.storage.AgentStore
+import fr.sevenskies.screenguard.storage.AppPolicyStore
+import fr.sevenskies.screenguard.usage.AppUsageLedger
 import fr.sevenskies.screenguard.storage.TrackingStatus
 import fr.sevenskies.screenguard.security.ParentPin
+import fr.sevenskies.screenguard.tracking.AgentDiagnostics
 import fr.sevenskies.screenguard.tracking.ProtectionHealthReporter
 import fr.sevenskies.screenguard.usage.UsageLedger
 
@@ -41,6 +45,8 @@ class GuardAccessibilityService : AccessibilityService() {
     private fun loc(s: String): String = ScreenGuardI18n.text(this, s)
     private lateinit var state: TrackingStatus
     private lateinit var ledger: UsageLedger
+    private lateinit var appPolicies: AppPolicyStore
+    private lateinit var appLedger: AppUsageLedger
     private lateinit var windows: WindowManager
     private lateinit var power: PowerManager
     private lateinit var keyguard: KeyguardManager
@@ -48,6 +54,8 @@ class GuardAccessibilityService : AccessibilityService() {
     private var overlay: View? = null
     private var currentPackage: String? = null
     private var lastWasLock = false
+    private var appBlockStartedAt: Long = 0L
+    private var appBlockPackage: String? = null
     private var lastDiagnostic: String? = null
     private var lastFallbackElapsed = 0L
     private var overlayKind: String? = null
@@ -66,8 +74,11 @@ class GuardAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         state = TrackingStatus(this)
         ledger = UsageLedger(this)
+        appPolicies = AppPolicyStore(this)
+        appLedger = AppUsageLedger(this)
         parentPin = ParentPin(this)
         state.accessibilityServiceConnected = true
+        AgentDiagnostics(this).record(AgentDiagnostics.Event.ACCESSIBILITY_CONNECTED)
         Log.i("ScreenGuardGuard", "Accessibility service connected")
         windows = getSystemService(WindowManager::class.java)
         power = getSystemService(PowerManager::class.java)
@@ -209,13 +220,48 @@ class GuardAccessibilityService : AccessibilityService() {
         }
         val mode = state.policyAt(ledger.todaySeconds()).mode
         val locallyTestLocked = System.currentTimeMillis() < state.testLockUntilMillis
-        val block = (mode == EnforcementPolicy.Mode.LOCK || locallyTestLocked) &&
-            !isEssentialPackage(pkg)
+        val essential = isEssentialPackage(pkg)
+        val appPolicy = if (!essential && state.restrictionsEnabled) {
+            val config = appPolicies.config()
+            if (config != null) {
+                val app = appLedger.info(pkg)
+                if (app.id.isNotBlank()) AppGroupPolicy.decide(
+                    config, app, appLedger.todayGroupSeconds(), appPolicies.elsewhere())
+                else null
+            } else null
+        } else null
+        if (appPolicy?.needsApproval == true) {
+            val app = appLedger.info(pkg)
+            if (app.id.isNotBlank()) appPolicies.queueApproval(app)
+        }
+        val appDenied = appPolicy?.blocked == true
+        // Linux can terminate a process; Android cannot terminate arbitrary apps.
+        // Give an exhausted time-limit 10 seconds, then cover only that app
+        // with an Accessibility overlay. Approvals/blocked-group take effect now.
+        if (appDenied && appBlockPackage != pkg) {
+            appBlockPackage = pkg
+            appBlockStartedAt = now
+            if (appPolicy?.reason == "group_limit") {
+                Toast.makeText(this,
+                    loc("Quota de cette application épuisé : blocage dans 10 secondes."),
+                    Toast.LENGTH_LONG).show()
+            }
+        } else if (!appDenied) {
+            appBlockPackage = null
+            appBlockStartedAt = 0L
+        }
+        val appGrace = appPolicy?.reason == "group_limit" &&
+            (now - appBlockStartedAt < 10_000L)
+        val blockApp = appDenied && !appGrace
+        val block = !essential &&
+            (mode == EnforcementPolicy.Mode.LOCK || locallyTestLocked || blockApp)
         val diagnosis = when {
             isEssentialPackage(pkg) -> "Application protégée : $pkg"
             locallyTestLocked -> if (block) "TEST : blocage demandé pour $pkg"
                 else "TEST : application ignorée"
             mode == EnforcementPolicy.Mode.LOCK -> "Quota épuisé : blocage demandé pour $pkg"
+            blockApp -> "Limite applicative : blocage demandé pour $pkg"
+            appGrace -> "Limite applicative : fermeture dans 10 secondes pour $pkg"
             else -> "Quota autorisé pour $pkg"
         }
         publishDiagnostic(diagnosis, pkg)
@@ -224,7 +270,11 @@ class GuardAccessibilityService : AccessibilityService() {
                 else "Application access restored or essential app opened")
             lastWasLock = block
         }
-        if (block) showOverlay() else hideOverlay()
+        if (block) {
+            if (blockApp && mode != EnforcementPolicy.Mode.LOCK && !locallyTestLocked) {
+                showAppOverlay(appPolicy?.reason ?: "group_limit")
+            } else showOverlay()
+        } else hideOverlay()
     }
 
     private fun isKeyboardPackage(pkg: String): Boolean =
@@ -418,6 +468,56 @@ class GuardAccessibilityService : AccessibilityService() {
         return pkg == resolved
     }
 
+    private fun showAppOverlay(reason: String) {
+        if (overlayKind == "app" && overlay != null) return
+        hideOverlay()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(36, 36, 36, 36)
+            setBackgroundColor(Color.rgb(18, 26, 42))
+        }
+        content.addView(TextView(this).apply {
+            text = loc("Application protégée")
+            textSize = 27f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        })
+        content.addView(TextView(this).apply {
+            text = when (reason) {
+                "approval_required" -> loc("Cette application attend l'autorisation des parents.")
+                "parent_denied" -> loc("Cette application est bloquée par les parents.")
+                else -> loc("Le temps autorisé pour cette application est terminé.")
+            }
+            textSize = 17f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setPadding(0, 22, 0, 30)
+        })
+        content.addView(Button(this).apply {
+            text = loc("Retour à l'accueil")
+            setOnClickListener {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                hideOverlay()
+            }
+        })
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply { gravity = Gravity.CENTER; title = "ScreenGuard - application restreinte" }
+        runCatching {
+            windows.addView(content, params)
+            overlay = content
+            overlayKind = "app"
+        }.onFailure {
+            Log.e("ScreenGuardGuard", "App overlay unavailable", it)
+        }
+    }
+
     private fun showOverlay() {
         if (overlayKind == "quota" && overlay != null) return
         hideOverlay()
@@ -483,6 +583,7 @@ class GuardAccessibilityService : AccessibilityService() {
     override fun onInterrupt() { hideOverlay() }
 
     override fun onDestroy() {
+        AgentDiagnostics(this).record(AgentDiagnostics.Event.ACCESSIBILITY_STOPPED)
         if (::state.isInitialized) {
             state.accessibilityServiceConnected = false
             state.lastGuardReason = "Service d'accessibilité arrêté"

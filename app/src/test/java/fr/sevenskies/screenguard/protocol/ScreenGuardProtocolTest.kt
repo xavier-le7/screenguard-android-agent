@@ -20,11 +20,33 @@ class ScreenGuardProtocolTest {
 
     @Test fun helloMatchesUpstreamKeys() {
         val payload = JSONObject(
-            ScreenGuardProtocol.agentHello("machine-2", "Android-Sam", "Europe/Paris")
+            ScreenGuardProtocol.agentHello("machine-2", "Android-Sam", "Europe/Paris", "0.5.3")
         ).getJSONObject("payload")
         assertEquals(0, payload.getInt("last_config_version"))
         assertEquals("Europe/Paris", payload.getString("timezone"))
+        assertEquals("0.5.3", payload.getString("agent_version"))
         assertEquals(0, payload.getJSONArray("capabilities").length())
+    }
+
+    @Test fun serverCompatibilityVersionMustBeNumeric() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ScreenGuardProtocol.agentHello("a", "b", "UTC", "android-0.5.3")
+        }
+        val payload = JSONObject(ScreenGuardProtocol.agentHello("a", "b", "UTC", "0.10.18"))
+            .getJSONObject("payload")
+        assertEquals("0.10.18", payload.getString("agent_version"))
+    }
+
+    @Test fun webFilterCapabilityCanFollowLiveVpnState() {
+        fun hello(dnsRunning: Boolean) = JSONObject(ScreenGuardProtocol.agentHello(
+            "tablet", "Android", "Europe/Paris", "0.10.18",
+            if (dnsRunning) listOf("app_usage", "web_filter") else listOf("app_usage")
+        )).getJSONObject("payload").getJSONArray("capabilities")
+
+        assertEquals(2, hello(true).length())
+        assertEquals("web_filter", hello(true).getString(1))
+        assertEquals(1, hello(false).length())
+        assertEquals("app_usage", hello(false).getString(0))
     }
 
     @Test fun userListKeepsStableLocalUid() {
@@ -95,6 +117,55 @@ class ScreenGuardProtocolTest {
         assertEquals(0, JSONObject(ScreenGuardProtocol.quotaHeartbeat())
             .getJSONObject("payload").getJSONArray("users")
             .getJSONObject(0).getInt("active_seconds_since_last"))
+    }
+
+    @Test fun remoteLogsResponseUsesUpstreamEnvelope() {
+        val response = JSONObject(ScreenGuardProtocol.logResponse(listOf(
+            "2026-11-07T12:00:00Z tracking_started",
+            "2026-11-07T12:01:00Z health tracking=true"
+        )))
+        assertEquals("log_response", response.getString("type"))
+        val lines = response.getJSONObject("payload").getJSONArray("lines")
+        assertEquals(2, lines.length())
+        assertEquals("2026-11-07T12:00:00Z tracking_started", lines.getString(0))
+    }
+
+    @Test fun remoteLogsAreBoundedAndSingleLine() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ScreenGuardProtocol.logResponse(List(51) { "entry" })
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ScreenGuardProtocol.logResponse(listOf("forbidden\nline"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ScreenGuardProtocol.logResponse(listOf("x".repeat(513)))
+        }
+        val request = ScreenGuardProtocol.parse(
+            ScreenGuardProtocol.envelope("fetch_logs", JSONObject())
+        )
+        assertEquals("fetch_logs", request.type)
+    }
+
+    @Test fun appUsageSyncAndRequestMatchUpstream() {
+        val payload = JSONObject(ScreenGuardProtocol.appUsageSync(
+            listOf(ScreenGuardProtocol.AppUsage("2026-11-07",
+                "desktop:android.org.example.game", "Game", listOf("Game"), 300L)),
+            listOf(ScreenGuardProtocol.GroupUsage("2026-11-07", "group-1", 300L))
+        ))
+        assertEquals("app_usage_sync", payload.getString("type"))
+        val body = payload.getJSONObject("payload")
+        assertEquals(300L, body.getJSONArray("entries").getJSONObject(0).getLong("seconds_total"))
+        assertEquals(300L, body.getJSONArray("groups").getJSONObject(0).getLong("seconds_total"))
+        val request = JSONObject(ScreenGuardProtocol.appRequest(
+            "desktop:android.org.example.game", "Game", listOf("Game")))
+        assertEquals("app_request", request.getString("type"))
+        assertEquals(1000, request.getJSONObject("payload").getInt("local_uid"))
+    }
+
+    @Test fun capabilitiesAreReportedOnlyWhenSupported() {
+        val parsed = JSONObject(ScreenGuardProtocol.agentHello(
+            "a", "b", "UTC", "0.5.3", listOf("app_usage"))).getJSONObject("payload")
+        assertEquals("app_usage", parsed.getJSONArray("capabilities").getString(0))
     }
 
     @Test fun pairingCodeHasExpectedAlphabet() {

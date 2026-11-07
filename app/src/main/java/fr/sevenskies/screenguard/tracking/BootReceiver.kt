@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import fr.sevenskies.screenguard.storage.AgentStore
+import fr.sevenskies.screenguard.network.DnsVpnService
+import android.net.VpnService
 import fr.sevenskies.screenguard.storage.TrackingStatus
 import fr.sevenskies.screenguard.usage.UsageLedger
 
@@ -17,6 +19,14 @@ class BootReceiver : BroadcastReceiver() {
         // foreground service following an APK upgrade, without re-pairing.
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED &&
             intent?.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        if (DnsVpnService.isOptedIn(context) && VpnService.prepare(context) == null) {
+            runCatching {
+                context.startForegroundService(
+                    Intent(context, DnsVpnService::class.java)
+                        .setAction(DnsVpnService.ACTION_START)
+                )
+            }
+        }
         if (!TrackingStatus(context).trackingEnabled) return
         if (AgentStore(context).loadToken() == null) return
         if (!UsageLedger(context).hasPermission()) return

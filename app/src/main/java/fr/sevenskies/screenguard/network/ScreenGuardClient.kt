@@ -1,7 +1,11 @@
 package fr.sevenskies.screenguard.network
 
+import fr.sevenskies.screenguard.BuildConfig
 import fr.sevenskies.screenguard.protocol.ScreenGuardProtocol
 import fr.sevenskies.screenguard.storage.AgentStore
+import fr.sevenskies.screenguard.storage.AppPolicyStore
+import fr.sevenskies.screenguard.enforcement.AppGroupPolicy
+import fr.sevenskies.screenguard.usage.AppUsageLedger
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -15,14 +19,18 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 /**
- * Compatible only with upstream ScreenGuard v0.10.17.
+ * Compatible with upstream ScreenGuard v0.10.18 (backward-compatible messages).
  * Usage snapshots are cumulative (server MAX reconciliation); heartbeat
  * ALWAYS reports zero active seconds to prevent a separate additive charge.
  */
 class ScreenGuardClient(
     private val store: AgentStore,
     private val events: Events,
-    private val usageSnapshot: (() -> Map<String, Long>)? = null
+    private val usageSnapshot: (() -> Map<String, Long>)? = null,
+    private val appUsageSnapshot: (() -> AppUsageLedger.Snapshot)? = null,
+    private val currentForeground: (() -> AppGroupPolicy.App?)? = null,
+    private val policyStore: AppPolicyStore? = null,
+    private val webFilterRunning: (() -> Boolean)? = null
 ) {
     interface Events {
         fun status(text: String)
@@ -34,6 +42,12 @@ class ScreenGuardClient(
         fun warningThresholds(values: List<Int>) {}
         fun immediateLock() {}
         fun unpaired() {}
+        /** Redacted agent-owned events for upstream fetch_logs; never Android system logcat. */
+        fun diagnosticLogs(): List<String> = emptyList()
+        /** Upstream update_agent cannot silently install APKs on Android. */
+        fun updateRequested() {}
+        /** WebSocket write queued; the upstream wire protocol has no ACK. */
+        fun appUsageSyncQueued(apps: Int, groups: Int) {}
         /** A message from a parent, delivered only if this agent is online. */
         fun parentMessage(message: ScreenGuardProtocol.ParentMessage) {}
     }
@@ -54,6 +68,7 @@ class ScreenGuardClient(
     private var heartbeatTask: ScheduledFuture<*>? = null
     private var reconnectTask: ScheduledFuture<*>? = null
     private var retry = 0
+    private val requestedApps = mutableSetOf<String>()
 
     fun pair(url: String, child: String) {
         check(!closed)
@@ -134,6 +149,21 @@ class ScreenGuardClient(
         }
     }
 
+    /**
+     * ScreenGuard 0.10.18 persists 'web_filter_available' from agent_hello
+     * ONLY on initial WebSocket connection. A subsequent agent_hello on the
+     * same socket updates version but NOT capabilities. Force an authenticated
+     * reconnect whenever our VPN starts/stops.
+     */
+    fun refreshCapabilities() {
+        if (closed) return
+        scheduler.execute {
+            if (closed || store.loadToken() == null) return@execute
+            reconnectTask?.cancel(false)
+            connectSocket()
+        }
+    }
+
     private fun connectSocket() {
         if (closed) return
         val token = store.loadToken()
@@ -156,10 +186,19 @@ class ScreenGuardClient(
                     return
                 }
                 retry = 0
+                requestedApps.clear()
                 connected = true
                 lastResponseElapsed = SystemClock.elapsedRealtime()
                 webSocket.send(ScreenGuardProtocol.agentHello(
-                    store.machineId, hostname(), TimeZone.getDefault().id
+                    store.machineId, hostname(), TimeZone.getDefault().id,
+                    BuildConfig.VERSION_NAME,
+                    buildList {
+                        if (appUsageSnapshot != null) add("app_usage")
+                        // The server's only web-filter indication is its
+                        // availability badge. Reflect *running* DNS VPN only;
+                        // this does not imply DoH/DoT bypass resistance.
+                        if (webFilterRunning?.invoke() == true) add("web_filter")
+                    }
                 ))
                 webSocket.send(ScreenGuardProtocol.userListUpdate(store.child))
                 sendQuotaSnapshot(webSocket)
@@ -189,6 +228,7 @@ class ScreenGuardClient(
                     when (message.type) {
                         "pong" -> Unit // Transport still alive; not proof quota was updated.
                         "remaining_update" -> {
+                            policyStore?.applyRemaining(message)
                             val value = ScreenGuardProtocol.remainingForLocalUser(message)
                             if (value != null) {
                                 lastResponseElapsed = SystemClock.elapsedRealtime()
@@ -199,8 +239,21 @@ class ScreenGuardClient(
                             }
                         }
                         "config_push" -> {
+                            policyStore?.applyConfig(message)
+                            requestedApps.clear()
                             ScreenGuardProtocol.warningThresholds(message)?.let {
                                 events.warningThresholds(it)
+                            }
+                        }
+                        "update_agent" -> {
+                            events.updateRequested()
+                        }
+                        "fetch_logs" -> {
+                            // This socket is authenticated with the paired agent token.
+                            // No arbitrary file reads, system logcat or remote commands.
+                            val lines = events.diagnosticLogs()
+                            check(webSocket.send(ScreenGuardProtocol.logResponse(lines))) {
+                                "Unable to queue log_response"
                             }
                         }
                         "config_reload" -> {
@@ -213,6 +266,7 @@ class ScreenGuardClient(
                             }
                         }
                         "unpair" -> {
+                            policyStore?.clear()
                             store.clearToken()
                             events.unpaired()
                             events.status("Agent dissocié par le serveur.")
@@ -255,7 +309,42 @@ class ScreenGuardClient(
                 throw IllegalStateException("usage_sync was not queued")
             }
         }
-        // IMPORTANT: server v0.10.17 ADDS active heartbeat seconds. Always 0.
+        appUsageSnapshot?.invoke()?.let { snapshot ->
+            // Upstream uses MAX upserts; re-sending is safe after lost ACK/reconnect.
+            // Chunk per 200 entries to avoid oversized WebSocket frames.
+            val apps = snapshot.apps.map {
+                ScreenGuardProtocol.AppUsage(it.date, it.app.id, it.app.displayName,
+                    it.app.categories, it.seconds)
+            }
+            val groups = snapshot.groups.map {
+                ScreenGuardProtocol.GroupUsage(it.date, it.groupId, it.seconds)
+            }
+            if (apps.isEmpty()) {
+                if (groups.isNotEmpty() && !ws.send(ScreenGuardProtocol.appUsageSync(emptyList(), groups)))
+                    throw IllegalStateException("group usage sync not queued")
+            } else {
+                apps.chunked(200).forEachIndexed { index, chunk ->
+                    if (!ws.send(ScreenGuardProtocol.appUsageSync(chunk, if (index == 0) groups else emptyList())))
+                        throw IllegalStateException("app usage sync not queued")
+                }
+            }
+            if (apps.isNotEmpty() || groups.isNotEmpty())
+                events.appUsageSyncQueued(apps.size, groups.size)
+            val config = policyStore?.config()
+            val foreground = currentForeground?.invoke()
+            if (config != null && foreground != null && foreground.id.isNotBlank() &&
+                AppGroupPolicy.decide(config, foreground, emptyMap(), emptyMap()).needsApproval) {
+                policyStore.queueApproval(foreground)
+            }
+            policyStore?.pendingRequests()?.forEach { pending ->
+                if (pending.id !in requestedApps &&
+                    ws.send(ScreenGuardProtocol.appRequest(
+                        pending.id, pending.displayName, pending.categories))) {
+                    requestedApps.add(pending.id)
+                }
+            }
+        }
+        // Screen time is sent only through cumulative usage_sync. Never charge twice.
         if (!ws.send(ScreenGuardProtocol.quotaHeartbeat())) {
             throw IllegalStateException("heartbeat was not queued")
         }

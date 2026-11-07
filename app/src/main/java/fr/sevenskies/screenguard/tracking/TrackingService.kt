@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.net.Uri
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
@@ -20,7 +21,11 @@ import android.util.Log
 import fr.sevenskies.screenguard.i18n.ScreenGuardI18n
 import fr.sevenskies.screenguard.MainActivity
 import fr.sevenskies.screenguard.network.ScreenGuardClient
+import fr.sevenskies.screenguard.network.DnsVpnService
 import fr.sevenskies.screenguard.storage.AgentStore
+import fr.sevenskies.screenguard.storage.AppPolicyStore
+import fr.sevenskies.screenguard.usage.AppUsageLedger
+import fr.sevenskies.screenguard.enforcement.AppGroupPolicy
 import fr.sevenskies.screenguard.storage.TrackingStatus
 import fr.sevenskies.screenguard.usage.UsageLedger
 
@@ -35,11 +40,24 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     private lateinit var store: AgentStore
     private lateinit var state: TrackingStatus
     private lateinit var ledger: UsageLedger
+    private lateinit var appLedger: AppUsageLedger
+    private lateinit var appPolicies: AppPolicyStore
+    private lateinit var diagnostics: AgentDiagnostics
     private var client: ScreenGuardClient? = null
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
     private var receiverRegistered = false
     private var networkRegistered = false
+    private var dnsStateReceiverRegistered = false
+    private val dnsStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (running && intent?.action == DnsVpnService.ACTION_STATE_CHANGED) {
+                // Version 0.10.18 server only applies capability flags on
+                // the initial authenticated WebSocket hello.
+                client?.refreshCapabilities()
+            }
+        }
+    }
     private lateinit var connectivity: ConnectivityManager
     private val wakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -79,6 +97,15 @@ class TrackingService : Service(), ScreenGuardClient.Events {
             } catch (t: Exception) {
                 state.message = "Collecte locale indisponible : " + t.javaClass.simpleName
             }
+            if (running && ledger.hasPermission()) {
+                runCatching {
+                    appLedger.collect(appPolicies.config() ?: AppGroupPolicy.Config(
+                        emptyList(), null, emptySet()))
+                }.onFailure {
+                    Log.w("ScreenGuardApps", "App usage sample unavailable", it)
+                }
+                if (appPolicies.pendingRequests().isNotEmpty()) client?.refreshConnection()
+            }
             if (running) {
                 ProtectionHealthReporter.check(this@TrackingService, state, ledger.hasPermission())
                 handler.postDelayed(this, SAMPLE_INTERVAL_MILLIS)
@@ -91,6 +118,9 @@ class TrackingService : Service(), ScreenGuardClient.Events {
         store = AgentStore(this)
         state = TrackingStatus(this)
         ledger = UsageLedger(this)
+        appLedger = AppUsageLedger(this)
+        appPolicies = AppPolicyStore(this)
+        diagnostics = AgentDiagnostics(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -114,15 +144,28 @@ class TrackingService : Service(), ScreenGuardClient.Events {
             running = true
             state.trackingEnabled = true
             state.serviceRunning = true
+            diagnostics.record(AgentDiagnostics.Event.TRACKING_STARTED)
             state.message = "Suivi démarré. Connexion au serveur..."
             runCatching {
                 if (ledger.collect()) {
                     state.lastCollectionMillis = System.currentTimeMillis()
                 }
+                appLedger.collect(appPolicies.config() ?: AppGroupPolicy.Config(
+                    emptyList(), null, emptySet()))
             }.onFailure {
                 state.message = "Statistiques indisponibles : " + it.javaClass.simpleName
             }
-            client = ScreenGuardClient(store, this) { ledger.usageSnapshot() }
+            client = ScreenGuardClient(
+                store, this, { ledger.usageSnapshot() },
+                { appLedger.snapshot() },
+                { appLedger.foregroundApp() },
+                appPolicies,
+                { DnsVpnService.isActive(this) }
+            )
+            registerReceiver(dnsStateReceiver,
+                IntentFilter(DnsVpnService.ACTION_STATE_CHANGED),
+                Context.RECEIVER_NOT_EXPORTED)
+            dnsStateReceiverRegistered = true
             client?.connect()
             // Screen-unlock triggers a refresh even after prolonged Doze.
             registerReceiver(wakeReceiver, IntentFilter().apply {
@@ -143,6 +186,31 @@ class TrackingService : Service(), ScreenGuardClient.Events {
 
     override fun status(text: String) {
         state.message = text
+        // Never write the raw status: it can contain a hostname or error detail.
+        when {
+            text == "Serveur connecté — synchronisation active." ->
+                diagnostics.record(AgentDiagnostics.Event.NETWORK_CONNECTED)
+            text.startsWith("Hors ligne") || text.startsWith("Connexion interrompue") ->
+                diagnostics.record(AgentDiagnostics.Event.NETWORK_INTERRUPTED)
+        }
+    }
+
+    override fun diagnosticLogs(): List<String> {
+        diagnostics.record(AgentDiagnostics.Event.FETCH_LOGS_REQUESTED)
+        val events = diagnostics.snapshot(state, ledger.hasPermission())
+        val summaries = listOf(
+            runCatching { appLedger.diagnosticSummary() }
+                .getOrDefault("apps_scan=diagnostic_unavailable"),
+            DnsVpnService.diagnosticSummary(this),
+            diagnostics.appSyncSummary()
+        )
+        // One health line + three aggregate summaries + 46 fixed-vocabulary
+        // events: always <= 50 lines for ScreenGuard fetch_logs.
+        return events.take(1) + summaries + events.drop(1).takeLast(46)
+    }
+
+    override fun appUsageSyncQueued(apps: Int, groups: Int) {
+        diagnostics.recordAppSync(apps, groups)
     }
 
     override fun remaining(minutes: Int, enforce: String) {
@@ -154,6 +222,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
 
     override fun policy(decision: fr.sevenskies.screenguard.protocol.ScreenGuardProtocol.RemainingDecision) {
         state.updateFromServer(decision, ledger.todaySeconds())
+        // Do not record high-frequency quota updates in the persistent ring.
         Log.i("ScreenGuardSync", "server policy=" + decision.enforce +
             " remaining_min=" + decision.minutes + " local_seconds=" + ledger.todaySeconds())
         state.message = "Serveur actif — décision : " + decision.enforce
@@ -165,6 +234,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     }
 
     override fun immediateLock() {
+        diagnostics.record(AgentDiagnostics.Event.LOCK_REQUESTED)
         state.updateFromServer(
             fr.sevenskies.screenguard.protocol.ScreenGuardProtocol.RemainingDecision(
                 0, "lock", null
@@ -179,6 +249,7 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     ) {
         handler.post {
             if (!running) return@post
+            diagnostics.record(AgentDiagnostics.Event.PARENT_NOTIFICATION_RECEIVED)
             runCatching {
                 val delivered = ParentMessageNotifier.show(this, message)
                 state.message = if (delivered)
@@ -192,7 +263,33 @@ class TrackingService : Service(), ScreenGuardClient.Events {
         }
     }
 
+    override fun updateRequested() {
+        handler.post {
+            if (!running) return@post
+            val notifications = getSystemService(NotificationManager::class.java)
+            val channel = "screen_guard_updates"
+            notifications.createNotificationChannel(NotificationChannel(
+                channel, "Mises à jour ScreenGuard", NotificationManager.IMPORTANCE_HIGH
+            ))
+            val destination = Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://github.com/xavier-le7/screenguard-android-agent/releases/latest"))
+            val open = PendingIntent.getActivity(
+                this, 22, destination,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            notifications.notify(2205, Notification.Builder(this, channel)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("Mise à jour de ScreenGuard Android")
+                .setContentText("Une mise à jour a été demandée par le serveur. " +
+                    "Installation manuelle requise sur Android.")
+                .setContentIntent(open)
+                .setAutoCancel(true).build())
+        }
+    }
+
     override fun unpaired() {
+        appPolicies.clear()
+        diagnostics.record(AgentDiagnostics.Event.AGENT_UNPAIRED)
         state.restrictionsEnabled = false
         state.trackingEnabled = false
         stopSelf()
@@ -201,8 +298,13 @@ class TrackingService : Service(), ScreenGuardClient.Events {
     override fun paired() { /* Pairing happens in the parent bootstrap UI. */ }
 
     override fun onDestroy() {
+        if (::diagnostics.isInitialized) diagnostics.record(AgentDiagnostics.Event.TRACKING_STOPPED)
         running = false
         handler.removeCallbacks(sample)
+        if (dnsStateReceiverRegistered) {
+            unregisterReceiver(dnsStateReceiver)
+            dnsStateReceiverRegistered = false
+        }
         if (receiverRegistered) {
             unregisterReceiver(wakeReceiver)
             receiverRegistered = false

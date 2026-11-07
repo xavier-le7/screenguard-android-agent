@@ -21,6 +21,8 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.net.Uri
+import android.net.VpnService
+import fr.sevenskies.screenguard.network.DnsVpnService
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
@@ -39,6 +41,7 @@ import fr.sevenskies.screenguard.enforcement.EnforcementPolicy
 import fr.sevenskies.screenguard.enforcement.SensitiveSettingsPolicy
 import fr.sevenskies.screenguard.enforcement.GuardAccessibilityService
 import fr.sevenskies.screenguard.network.ScreenGuardClient
+import fr.sevenskies.screenguard.usage.AppUsageLedger
 import fr.sevenskies.screenguard.security.ParentPin
 import fr.sevenskies.screenguard.security.ScreenGuardDeviceAdminReceiver
 import fr.sevenskies.screenguard.storage.AgentStore
@@ -67,6 +70,7 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
     private lateinit var trackingHealth: TextView
     private lateinit var guardHealth: TextView
     private lateinit var settingsHealth: TextView
+    private lateinit var dnsHealth: TextView
     private lateinit var infoNotice: TextView
     private lateinit var setupPanel: LinearLayout
     private lateinit var controlPanel: LinearLayout
@@ -83,6 +87,9 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
     private lateinit var trackingAction: TextView
     private lateinit var restrictAction: TextView
     private lateinit var sensitiveAction: TextView
+    private lateinit var dnsStatusView: TextView
+    private lateinit var dnsEnableAction: TextView
+    private lateinit var dnsDisableAction: TextView
     private lateinit var notificationAction: TextView
     private var pendingAdminRequest = false
     private lateinit var diagnosticText: TextView
@@ -150,7 +157,7 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
         space(column, 10)
         buildDiagnostics(column)
         space(column, 18)
-        column.addView(label("ScreenGuard 0.5.3",
+        column.addView(label("ScreenGuard " + BuildConfig.VERSION_NAME,
             12f, MUTED).apply { gravity = Gravity.CENTER })
 
         setupExpanded = store.loadToken() == null || !ledger.hasPermission() ||
@@ -243,6 +250,7 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
         trackingHealth = healthRow(c, "Suivi du temps")
         guardHealth = healthRow(c, "Blocage des applications")
         settingsHealth = healthRow(c, "Réglages sensibles")
+        dnsHealth = healthRow(c, "Filtrage DNS")
         root.addView(c, full(-2))
     }
 
@@ -364,6 +372,56 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
             }
         }
         setupPanel.addView(restrictAction, full(48))
+        space(setupPanel, 8)
+        setupPanel.addView(label("FILTRAGE WEB (EXPÉRIMENTAL)", 11f, MUTED, true))
+        space(setupPanel, 6)
+        setupPanel.addView(label(
+            "Le VPN DNS local applique les domaines interdits du serveur. Il ne bloque pas " +
+                "les navigateurs qui utilisent leur propre DNS chiffré (DoH/DoT). " +
+                "Il peut entrer en conflit avec un autre VPN.", 12f, MUTED
+        ))
+        space(setupPanel, 9)
+        dnsStatusView = label("", 14f, NAVY, true)
+        setupPanel.addView(dnsStatusView)
+        space(setupPanel, 8)
+        dnsEnableAction = action("Activer le filtrage DNS", false) {
+            requireParent {
+                if (DnsVpnService.isRunning) {
+                    inform("Filtrage DNS déjà actif.")
+                } else {
+                    val permission = VpnService.prepare(this)
+                    if (permission != null) {
+                        @Suppress("DEPRECATION")
+                        startActivityForResult(permission, 42)
+                    } else {
+                        startForegroundService(Intent(this, DnsVpnService::class.java)
+                            .setAction(DnsVpnService.ACTION_START))
+                        inform("Démarrage du VPN DNS demandé.")
+                    }
+                }
+                updateDnsControls()
+            }
+        }
+        setupPanel.addView(dnsEnableAction, full(48))
+        space(setupPanel, 7)
+        dnsDisableAction = action("Désactiver le filtrage DNS", false, true) {
+            requireParent {
+                // Intentional independent STOP, not a toggle based on a
+                // potentially stale in-memory service flag.
+                DnsVpnService.requestStop(this)
+                runCatching {
+                    startService(Intent(this, DnsVpnService::class.java)
+                        .setAction(DnsVpnService.ACTION_STOP))
+                }.onFailure {
+                    // Preserve explicit parent choice even when Android rejects
+                    // an on-demand service start from an activity.
+                    stopService(Intent(this, DnsVpnService::class.java))
+                }
+                inform("Arrêt du filtrage DNS demandé ; le VPN doit disparaître.")
+                updateDnsControls()
+            }
+        }
+        setupPanel.addView(dnsDisableAction, full(48))
         space(setupPanel, 8)
         setupPanel.addView(label("PROTECTION DES RÉGLAGES", 11f, MUTED, true))
         space(setupPanel, 6)
@@ -516,7 +574,23 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
         diagnosticToggle.text = loc("Diagnostic avancé") + "  " + if (diagnosticsExpanded) "⌃" else "⌄"
     }
 
+    private fun updateDnsControls() {
+        if (!::dnsStatusView.isInitialized) return
+        val mode = DnsVpnService.status(this)
+        dnsStatusView.text = loc("Filtrage DNS : $mode")
+        dnsStatusView.setTextColor(if (DnsVpnService.isRunning) TEAL else MUTED)
+        if (::dnsEnableAction.isInitialized) {
+            dnsEnableAction.isEnabled = !DnsVpnService.isRunning
+            dnsEnableAction.alpha = if (dnsEnableAction.isEnabled) 1f else 0.45f
+        }
+        // Always permit explicit STOP, including stale/inconsistent VPN state.
+        if (::dnsDisableAction.isInitialized) {
+            dnsDisableAction.isEnabled = true
+        }
+    }
+
     private fun updateDashboard() {
+        updateDnsControls()
         val now = System.currentTimeMillis()
         val paired = store.loadToken() != null
         val statsAllowed = ledger.hasPermission()
@@ -620,6 +694,13 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
                 !parentalSettingsOpen,
             if (state.settingsGuardEnabled && adminIsActive() && guardOk &&
                 !parentalSettingsOpen) GREEN else AMBER)
+        val vpnRunning = DnsVpnService.isActive(this)
+        health(dnsHealth, when {
+            vpnRunning -> "● Actif (DNS)"
+            DnsVpnService.isRunning -> "● Arrêt en cours"
+            DnsVpnService.isOptedIn(this) -> "● Démarrage requis"
+            else -> "● Désactivé"
+        }, vpnRunning, if (vpnRunning) GREEN else AMBER)
 
         setupText.text = loc(if (paired)
             "✓ Appareil lié au profil ${store.child}. Aucun nouvel appairage nécessaire."
@@ -653,6 +734,10 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
             appendLine("Réponse quota : ${ago(syncAge)}")
             appendLine("Service suivi : ${state.serviceRunning}")
             appendLine("Dernier relevé : ${ago(sampleAge)}")
+            appendLine("Utilisation applications : " +
+                AppUsageLedger(this@MainActivity).diagnosticSummary())
+            appendLine("Filtrage DNS : " +
+                DnsVpnService.diagnosticSummary(this@MainActivity))
             appendLine("Accès statistiques : $statsAllowed")
             appendLine("Accessibilité : $accessAllowed")
             appendLine("Service accessibilité : ${state.accessibilityServiceConnected}")
@@ -727,6 +812,14 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
     @Deprecated("Android framework activity result, no AndroidX dependency")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 42) {
+            if (resultCode == Activity.RESULT_OK) {
+                startForegroundService(Intent(this, DnsVpnService::class.java)
+                    .setAction(DnsVpnService.ACTION_START))
+                inform("Autorisation VPN accordée : démarrage du filtre DNS.")
+            } else inform("Autorisation VPN refusée : filtrage non activé.")
+            return
+        }
         if (requestCode != 41 || !pendingAdminRequest) return
         pendingAdminRequest = false
         val activated = parentPin.isConfigured() && adminIsActive() &&
