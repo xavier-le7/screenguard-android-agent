@@ -11,6 +11,9 @@ val hasStableKey = !stableKeystorePath.isNullOrBlank() && !stableKeystorePasswor
 android {
     namespace = "fr.sevenskies.screenguard"
     compileSdk = 35
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "fr.sevenskies.screenguard.agent"

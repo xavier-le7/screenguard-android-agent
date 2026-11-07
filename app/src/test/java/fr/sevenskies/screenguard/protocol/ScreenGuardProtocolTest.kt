@@ -20,11 +20,20 @@ class ScreenGuardProtocolTest {
 
     @Test fun helloMatchesUpstreamKeys() {
         val payload = JSONObject(
-            ScreenGuardProtocol.agentHello("machine-2", "Android-Sam", "Europe/Paris")
+            ScreenGuardProtocol.agentHello("machine-2", "Android-Sam", "Europe/Paris", "0.5.3")
         ).getJSONObject("payload")
         assertEquals(0, payload.getInt("last_config_version"))
-        assertEquals("Europe/Paris", payload.getString("timezone"))
+        assertEquals("Europe/Paris", payload.getString("timezone"))\n        assertEquals("0.5.3", payload.getString("agent_version"))
         assertEquals(0, payload.getJSONArray("capabilities").length())
+    }
+
+    @Test fun serverCompatibilityVersionMustBeNumeric() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ScreenGuardProtocol.agentHello("a", "b", "UTC", "android-0.5.3")
+        }
+        val payload = JSONObject(ScreenGuardProtocol.agentHello("a", "b", "UTC", "0.10.18"))
+            .getJSONObject("payload")
+        assertEquals("0.10.18", payload.getString("agent_version"))
     }
 
     @Test fun userListKeepsStableLocalUid() {

@@ -36,17 +36,17 @@ object ScreenGuardProtocol {
                 .put("pairing_code", code)
         )
 
-    fun agentHello(machineId: String, hostname: String, timezone: String): String =
+    fun agentHello(machineId: String, hostname: String, timezone: String, versionName: String): String {\n        require(versionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+"))) {\n            "Android app version must be a numeric ScreenGuard-compatible semver"\n        }\n        return
         envelope(
             "agent_hello",
             JSONObject()
                 .put("machine_id", machineId)
                 .put("hostname", hostname)
                 .put("timezone", timezone)
-                .put("agent_version", "android-0.5.3")
+                .put("agent_version", versionName)
                 .put("last_config_version", 0)
                 .put("capabilities", JSONArray())
-        )
+    }
 
     fun userListUpdate(child: String): String =
         envelope(

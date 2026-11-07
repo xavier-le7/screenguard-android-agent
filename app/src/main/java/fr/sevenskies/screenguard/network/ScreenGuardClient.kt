@@ -1,6 +1,6 @@
 package fr.sevenskies.screenguard.network
 
-import fr.sevenskies.screenguard.protocol.ScreenGuardProtocol
+import fr.sevenskies.screenguard.BuildConfig\nimport fr.sevenskies.screenguard.protocol.ScreenGuardProtocol
 import fr.sevenskies.screenguard.storage.AgentStore
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -161,7 +161,8 @@ class ScreenGuardClient(
                 connected = true
                 lastResponseElapsed = SystemClock.elapsedRealtime()
                 webSocket.send(ScreenGuardProtocol.agentHello(
-                    store.machineId, hostname(), TimeZone.getDefault().id
+                    store.machineId, hostname(), TimeZone.getDefault().id,
+                    BuildConfig.VERSION_NAME
                 ))
                 webSocket.send(ScreenGuardProtocol.userListUpdate(store.child))
                 sendQuotaSnapshot(webSocket)
