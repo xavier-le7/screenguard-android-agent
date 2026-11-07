@@ -21,6 +21,8 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.net.Uri
+import android.net.VpnService
+import fr.sevenskies.screenguard.network.DnsVpnService
 import android.text.InputFilter
 import android.text.InputType
 import android.view.Gravity
@@ -150,7 +152,7 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
         space(column, 10)
         buildDiagnostics(column)
         space(column, 18)
-        column.addView(label("ScreenGuard 0.5.3",
+        column.addView(label("ScreenGuard " + BuildConfig.VERSION_NAME,
             12f, MUTED).apply { gravity = Gravity.CENTER })
 
         setupExpanded = store.loadToken() == null || !ledger.hasPermission() ||
@@ -364,6 +366,34 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
             }
         }
         setupPanel.addView(restrictAction, full(48))
+        space(setupPanel, 8)
+        setupPanel.addView(label("FILTRAGE WEB (EXPÉRIMENTAL)", 11f, MUTED, true))
+        space(setupPanel, 6)
+        setupPanel.addView(label(
+            "Le VPN DNS local applique les domaines interdits du serveur. Il ne bloque pas " +
+                "les navigateurs qui utilisent leur propre DNS chiffré (DoH/DoT). " +
+                "Il peut entrer en conflit avec un autre VPN.", 12f, MUTED
+        ))
+        space(setupPanel, 9)
+        setupPanel.addView(action("Activer / arrêter le filtrage DNS local", false) {
+            requireParent {
+                if (DnsVpnService.isRunning) {
+                    startService(Intent(this, DnsVpnService::class.java)
+                        .setAction(DnsVpnService.ACTION_STOP))
+                    inform("Arrêt du filtrage DNS demandé.")
+                } else {
+                    val permission = VpnService.prepare(this)
+                    if (permission != null) {
+                        @Suppress("DEPRECATION")
+                        startActivityForResult(permission, 42)
+                    } else {
+                        startForegroundService(Intent(this, DnsVpnService::class.java)
+                            .setAction(DnsVpnService.ACTION_START))
+                        inform("Filtrage DNS local demandé ; surveiller sa notification.")
+                    }
+                }
+            }
+        }, full(48))
         space(setupPanel, 8)
         setupPanel.addView(label("PROTECTION DES RÉGLAGES", 11f, MUTED, true))
         space(setupPanel, 6)
@@ -727,6 +757,14 @@ class MainActivity : Activity(), ScreenGuardClient.Events {
     @Deprecated("Android framework activity result, no AndroidX dependency")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 42) {
+            if (resultCode == Activity.RESULT_OK) {
+                startForegroundService(Intent(this, DnsVpnService::class.java)
+                    .setAction(DnsVpnService.ACTION_START))
+                inform("Autorisation VPN accordée : démarrage du filtre DNS.")
+            } else inform("Autorisation VPN refusée : filtrage non activé.")
+            return
+        }
         if (requestCode != 41 || !pendingAdminRequest) return
         pendingAdminRequest = false
         val activated = parentPin.isConfigured() && adminIsActive() &&

@@ -48,6 +48,19 @@
         </service>
 
         <service
+            android:name=".network.DnsVpnService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Optional, parent-authorized local DNS domain filtering" />
+        </service>
+
+        <service
             android:name=".tracking.TrackingService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
