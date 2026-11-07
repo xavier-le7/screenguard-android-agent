@@ -45,6 +45,8 @@ class ScreenGuardClient(
         fun diagnosticLogs(): List<String> = emptyList()
         /** Upstream update_agent cannot silently install APKs on Android. */
         fun updateRequested() {}
+        /** WebSocket write queued; the upstream wire protocol has no ACK. */
+        fun appUsageSyncQueued(apps: Int, groups: Int) {}
         /** A message from a parent, delivered only if this agent is online. */
         fun parentMessage(message: ScreenGuardProtocol.ParentMessage) {}
     }
@@ -304,6 +306,8 @@ class ScreenGuardClient(
                         throw IllegalStateException("app usage sync not queued")
                 }
             }
+            if (apps.isNotEmpty() || groups.isNotEmpty())
+                events.appUsageSyncQueued(apps.size, groups.size)
             val config = policyStore?.config()
             val foreground = currentForeground?.invoke()
             if (config != null && foreground != null && foreground.id.isNotBlank() &&

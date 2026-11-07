@@ -42,6 +42,18 @@ class AgentDiagnostics(context: Context) {
         listOf(summary) + readRecords().takeLast(MAX_LINES - 1)
     }
 
+    fun recordAppSync(apps: Int, groups: Int) {
+        prefs.edit().putInt("sync_apps", apps)
+            .putInt("sync_groups", groups)
+            .putLong("sync_at_ms", System.currentTimeMillis()).apply()
+    }
+
+    fun appSyncSummary(): String =
+        "sync_app_entries=" + prefs.getInt("sync_apps", 0) +
+        " sync_group_entries=" + prefs.getInt("sync_groups", 0) +
+        " sync_queued_at_ms=" + prefs.getLong("sync_at_ms", 0L) +
+        " sync_ack=unsupported"
+
     private fun readRecords(): MutableList<String> {
         val result = mutableListOf<String>()
         val arr = runCatching { JSONArray(prefs.getString("events", "[]")) }

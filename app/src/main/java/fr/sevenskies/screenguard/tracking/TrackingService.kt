@@ -21,6 +21,7 @@ import android.util.Log
 import fr.sevenskies.screenguard.i18n.ScreenGuardI18n
 import fr.sevenskies.screenguard.MainActivity
 import fr.sevenskies.screenguard.network.ScreenGuardClient
+import fr.sevenskies.screenguard.network.DnsVpnService
 import fr.sevenskies.screenguard.storage.AgentStore
 import fr.sevenskies.screenguard.storage.AppPolicyStore
 import fr.sevenskies.screenguard.usage.AppUsageLedger
@@ -181,7 +182,20 @@ class TrackingService : Service(), ScreenGuardClient.Events {
 
     override fun diagnosticLogs(): List<String> {
         diagnostics.record(AgentDiagnostics.Event.FETCH_LOGS_REQUESTED)
-        return diagnostics.snapshot(state, ledger.hasPermission())
+        val events = diagnostics.snapshot(state, ledger.hasPermission())
+        val summaries = listOf(
+            runCatching { appLedger.diagnosticSummary() }
+                .getOrDefault("apps_scan=diagnostic_unavailable"),
+            DnsVpnService.diagnosticSummary(this),
+            diagnostics.appSyncSummary()
+        )
+        // One health line + three aggregate summaries + 46 fixed-vocabulary
+        // events: always <= 50 lines for ScreenGuard fetch_logs.
+        return events.take(1) + summaries + events.drop(1).takeLast(46)
+    }
+
+    override fun appUsageSyncQueued(apps: Int, groups: Int) {
+        diagnostics.recordAppSync(apps, groups)
     }
 
     override fun remaining(minutes: Int, enforce: String) {
