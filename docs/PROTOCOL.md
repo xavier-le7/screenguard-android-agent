@@ -1,46 +1,65 @@
-# ScreenGuard v0.10.17 protocol compatibility
+# ScreenGuard server v0.10.18 — Android wire protocol
 
-The Android agent implements the **existing** WebSocket contract in [upstream ScreenGuard](https://github.com/adambie/screenguard/tree/v0.10.17). No new message types, server APIs, database changes or Linux agent changes are required.
+The Android child agent implements the existing ScreenGuard [upstream v0.10.18](https://github.com/adambie/screenguard/tree/v0.10.18) WebSocket protocol. No custom server endpoint, schema, database migration or Linux-agent change is required. **Server v0.10.17 does not support `app_usage_sync`.**
 
-## Pairing and logical identity
+## Transport, pairing and identity
 
-- Connect only to the user-configured secure WebSocket `wss://<server>/ws`, with standard TLS verification.
-- Submit `pairing_request` and store the returned bearer token in Android Keystore-encrypted private preferences.
-- Once authenticated, send `agent_hello` and `user_list_update`.
-- A single Android user is represented by the protocol's stable logical `local_uid: 1000`. The profile display name is entered at pairing, not hard-coded.
-- Administrators link that agent user to a profile in the existing ScreenGuard administration interface.
+Configure an HTTPS/TLS-trusted `wss://<server>/ws` URL. Pair using `pairing_request`; store the accepted bearer token encrypted using Android Keystore. On an authenticated connection:
 
-## Screen-time accounting
+- `agent_hello` contains `machine_id`, `hostname`, `timezone`, numeric `agent_version: "0.10.18"`, `last_config_version`, and `capabilities`.
+- `user_list_update` maps one Android user to protocol `local_uid: 1000`; the supplied display name is not hard-coded.
+- `capabilities` includes `app_usage` when the app collector is configured. It includes `web_filter` **only when the optional DNS VPN is running and the parent opted in**. The VPN's limited DNS coverage must not be confused with robust per-app web enforcement.
+- The server stores `web_filter_available` from the initial hello; the agent reconnects when the DNS service changes state to update this badge. The protocol has no dedicated live `dns_active` field.
 
-A `heartbeat` request contains the local UID with `active_seconds_since_last: 0`. This is intentional: upstream server accounting **adds** heartbeat deltas, whereas `usage_sync` reconciles cumulative daily totals using **MAX(existing, reported)**. Sending both active heartbeat time and usage snapshots would double-charge usage.
+## Daily whole-device time
 
-The agent sends `usage_sync.usage` records of the form:
+`usage_sync` provides daily cumulative values:
 
 ```json
-{"local_uid": 1000, "date": "2026-01-15", "used_seconds": 900}
+{"type":"usage_sync","payload":{"usage":[{"local_uid":1000,"date":"2026-11-07","used_seconds":900}]}}
 ```
 
-The normal connection sequence is `agent_hello`, `user_list_update`, `usage_sync`, then zero-active-time `heartbeat`, repeating while online. Identical daily cumulative snapshots can be resent safely after reconnection. The server calculates the shared quota across agents mapped to the same profile.
+The agent sends `heartbeat.users[].active_seconds_since_last = 0`. The server **adds** heartbeat deltas, whereas `usage_sync` reconciles cumulative totals using a maximum. Sending both would double-count time. Screen time is locally measured from interactive, unlocked Android `UsageStatsManager.queryEvents`; retained events are reconstructed after limited interruptions, subject to Android availability.
 
-Android measurement uses `UsageStatsManager.queryEvents`, counting only intervals when the display is interactive and unlocked. Daily totals are stored locally and split on the device's local calendar day, including time-zone transitions. Short disconnections can be reconstructed from retained events; Android process restarts and long gaps may lose precision. The device cannot know what other linked agents consume while it is offline.
+## Per-app accounting and limits
 
-## Incoming server commands
+On ScreenGuard v0.10.18, `app_usage_sync` carries cumulative daily application and group totals (simplified):
 
-- `remaining_update`: latest allow/warn/lock decision and remaining time for the matching `local_uid`.
-- `config_push`: warning thresholds and policy configuration.
-- `lock_now`: immediate restriction for the matching local user.
-- `config_reload`: refresh the connection/policy.
-- `notify_user`: parent message containing `local_uid`, `summary`, and `body`; display as a local Android notification only when online. No reply message is sent.
-- `unpair`: discard the local token.
-- `pong`: transport response; a null payload is valid.
+```json
+{
+  "type":"app_usage_sync",
+  "payload":{
+    "entries":[{"local_uid":1000,"date":"2026-11-07","app_id":"desktop:android.org.example.reader","display_name":"Reader","categories":[],"seconds_total":300}],
+    "groups":[{"local_uid":1000,"date":"2026-11-07","group_id":"example-group","seconds_total":300}]
+  }
+}
+```
 
-These names and fields are defined upstream; the Android implementation must not invent equivalent endpoints.
+Android app IDs use the accepted upstream `desktop:android.<package>` form. Only time in the foreground is tracked; Android cannot measure simultaneous desktop-style processes. Totals are cumulative and sent again on reconnect, rather than additive increments. An app may match a configured group via explicit ID, prefix or category rule.
 
-## Safety invariants
+- `config_push` includes `app_groups`, weekday `daily_limits`, `adjustment_today`, `app_approval` and `blocked_domains`. The agent stores matching local-user policy for offline enforcement.
+- `remaining_update.users[].group_usage_elsewhere` supplies usage from other devices; it is combined with local totals to enforce shared limits.
+- `app_request` asks the server to approve a newly used application. Requests are persisted locally to survive leaving the blocked app, and delivered when online.
+- Android uses an Accessibility overlay for blocked/group-expired apps, rather than a Linux process kill.
 
-1. Never send additive active seconds in a heartbeat.
-2. Never associate a received user event with another UID.
-3. Keep encrypted tokens out of logs, notifications and diagnostics.
-4. Keep fallback offline counters idempotent across reconnection.
-5. Preserve the server's authority over quotas and schedules.
-6. Do not assert that Android Accessibility/Device Administrator enforces absolute tamper resistance.
+## Incoming commands
+
+| Server message | Android handling |
+| --- | --- |
+| `remaining_update` | Quota decision and shared group usage for the matching local UID |
+| `config_push` | Thresholds, app groups, approvals and blocked domains |
+| `config_reload` | Reconnect/reload |
+| `lock_now` | Immediate local restrictions |
+| `notify_user` | One-way parent notification, only for the matching local UID while online |
+| `fetch_logs` | Reply with `log_response` containing up to 50 bounded, sanitized diagnostic lines |
+| `update_agent` | Notify parent with a link to Android Releases; **never run a Linux installer** |
+| `unpair` | Remove token and cached policy |
+| `pong` | Accept a null JSON payload |
+
+The normal connection also sends zero-additive `heartbeat`, cumulative `usage_sync` and `app_usage_sync` while online. The agent has no server-side acknowledgement for an individual app report: `sync_app_entries` in diagnostics indicates a **queued WebSocket send**, not proof that the server stored it.
+
+## Safety constraints
+
+Never log bearer tokens, pairing codes or child names; never associate events with another UID; do not send additive time in heartbeat; do not execute arbitrary server-side commands; preserve local/remote quota idempotency. The server controls policy and retention. Accessibility/legacy Device Administrator are not an OS security boundary.
+
+See [App usage](ANDROID_APP_USAGE.md), [DNS](ANDROID_DNS.md) and [Remote logs](ANDROID_REMOTE_LOGS.md).

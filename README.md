@@ -1,88 +1,101 @@
 # ScreenGuard Android Agent
 
-An independent Android companion for the self-hosted [ScreenGuard](https://github.com/adambie/screenguard) parental-control server, compatible with its **v0.10.17 protocol**.
+**Independent, open-source Android child agent for the self-hosted [ScreenGuard server](https://github.com/adambie/screenguard).** This repository is not the official upstream Android application and is not endorsed by the upstream maintainers.
 
-> **Experimental software.** This is not an official upstream client or an audited, tamper-proof parental-control product.
+[![Android CI](https://github.com/xavier-le7/screenguard-android-agent/actions/workflows/android-ci.yml/badge.svg)](https://github.com/xavier-le7/screenguard-android-agent/actions/workflows/android-ci.yml)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
 
-**License:** [GNU AGPL-3.0-or-later](LICENSE). Contributions, forks and upstream integration are welcome.
+**Current stable release:** **[v0.10.18](https://github.com/xavier-le7/screenguard-android-agent/releases/tag/v0.10.18)** (Android `versionCode 21`), for ScreenGuard **server v0.10.18**. Requires **Android 14 or later** (minSdk 34).
 
-## Features
+> **Important:** Parental controls are best-effort on Android. This agent is not a certified, tamper-proof product. Its optional DNS filter does **not** prevent DNS-over-HTTPS (DoH), DNS-over-TLS (DoT), IPv6 DNS or every VPN/browser bypass.
 
-- WSS pairing and encrypted token storage (Android Keystore).
-- Local screen-time accounting and cumulative synchronization of shared profile quotas.
-- Offline accounting, automatic reconnection, quota warnings and optional app restrictions.
-- Optional parent PIN and Accessibility-based protection of selected Android settings.
-- Optional legacy Device Administrator status, providing an additional uninstallation step (not a guaranteed PIN lock).
-- One-way parent messages via the existing server `notify_user` command.
-- French, English, Spanish, German, Portuguese and Polish interface resources.
+## Features in v0.10.18
 
-**Requirements:** Android 14+ (minSdk 34), a trusted ScreenGuard v0.10.17 server and a valid TLS WebSocket endpoint ending in `/ws`.
+| Feature | Behavior and limitations |
+| --- | --- |
+| Secure pairing | Configurable WSS `/ws` endpoint, pairing code, local bearer-token encryption with Android Keystore |
+| Screen time | Unlocked, interactive device time, offline daily totals and idempotent `usage_sync` shared-quota synchronization |
+| App usage | Foreground time per Android app; app names, categories and cumulative `app_usage_sync` sent to ScreenGuard 0.10.18 |
+| App groups | Weekday limits, parent adjustments, usage from other linked devices and Accessibility overlays for blocked/exhausted groups |
+| New-app approvals | Request parent approval using `app_request`; persist requests while offline |
+| Parental controls | Optional six-digit parent PIN, protected settings, 15-minute settings authorization and 60-second local blocking test |
+| Parent messages | One-way `notify_user` notifications when connected |
+| Remote logs | Respond to server `fetch_logs` with bounded, application-owned health/events and aggregate app/DNS diagnostics; **no raw logcat** |
+| Server update request | `update_agent` prompts a parent to open official Android Releases; no unattended APK installation |
+| Website domains | **Experimental, opt-in DNS-only VPN** applying server `blocked_domains` to normal DNS lookups, with separate parent-protected ON/OFF buttons |
+| DNS state | Local ACTIVE / STOPPING / PENDING / DISABLED indicators; when online, server's `web_filter_available` badge reflects an actively running, opted-in DNS VPN |
+| Recovery | Best-effort background reconnection and boot/APK-upgrade restart of opted-in services |
 
-## Setup
+The project has six locale resource sets (French, English, Spanish, German, Portuguese, Polish). Some recently added interface labels are still implemented as inline text and need full localization; contributions are welcome.
 
-1. Install an APK from a trusted release or build from source.
-2. Enter **your own server endpoint** (for example `wss://example.org/ws`) and a free-form child profile name. The app does not ship with an assigned server or profile.
-3. Pair using the code displayed in the agent and associate the device user with an existing profile in ScreenGuard administration.
-4. Allow Usage Access; start the persistent tracking service. Allow notifications to receive warnings and parent messages.
-5. Optionally enable Accessibility, restrictions and sensitive-settings protection with a separate six-digit parent PIN.
-6. Optionally activate Device Administrator after explicit Android consent. Confirm that calls, emergency features, Wi-Fi and unrelated app management remain accessible.
+## Install and pair
 
-For reliable tracking, some Android vendors require manually disabling battery optimization for the application.
+1. Install the **[maintainer-signed v0.10.18 APK](https://github.com/xavier-le7/screenguard-android-agent/releases/download/v0.10.18/screenguard-android-agent-v0.10.18.apk)**. Optionally verify the adjacent [SHA-256 file](https://github.com/xavier-le7/screenguard-android-agent/releases/download/v0.10.18/screenguard-android-agent-v0.10.18.apk.sha256).
+2. Use a reachable, trusted **ScreenGuard server v0.10.18 or later**. Enter your own `wss://your-server.example/ws` URL and the child's profile display name; **no server address is preconfigured**.
+3. Complete the pairing flow and associate the agent's logical user with the desired ScreenGuard profile.
+4. Grant Android **Usage Access** and notifications, then start tracking. Check the device/agent is online and that daily screen time appears in the server.
+5. For app blocking, enable the ScreenGuard **Accessibility** service and the restrictions, and set a six-digit parent PIN. Android may ask you to authorize restricted settings for sideloaded APKs.
+6. For optional web domains, go to the parent's settings, choose **Enable DNS filtering**, enter the parent PIN, and approve Android's VPN consent dialog. Verify the DNS status is **ACTIVE**. **Disable DNS filtering** is a separate parent-protected action.
+7. Test the app group, approvals and domain rules with a nonessential application or test domain. Verify normal connectivity, calls and access to essential system settings.
 
-## Downloads and releases
+Android vendors may require exempting ScreenGuard from battery optimization to keep foreground tracking reliable. The DNS VPN can conflict with other VPNs and may fail to resolve DNS if its upstream network is unavailable.
 
-Download maintainer-signed APKs from [GitHub Releases](../../releases) when available. Each release includes an APK and SHA-256 checksum; temporary CI artifacts are not the long-term download location. For automated distribution, the same APK is also archived in [GitHub Packages (GHCR)](../../pkgs/container/screenguard-android-agent-apk) as a non-runnable OCI package.
+**After a restart:** if the parent left DNS filtering **enabled**, the agent attempts to restore it (subject to Android VPN authorization and OEM background restrictions). If the parent explicitly **disabled** it, the preference is retained and the filter should not restart.
 
-See [Releasing](docs/RELEASING.md) for the tag process. This is experimental software, not a certified anti-tampering product.
+For permission details, troubleshooting and a test checklist, see [Android setup](docs/PHASE3.md), [App usage](docs/ANDROID_APP_USAGE.md), [DNS filtering](docs/ANDROID_DNS.md), and [Remote diagnostics](docs/ANDROID_REMOTE_LOGS.md).
 
-## Building
+## Android / server compatibility
 
-Install JDK 17, Gradle 8.9 and Android SDK 35, then run:
+The agent reports `agent_version = 0.10.18` rather than the older `android-0.5.3` string; this allows ScreenGuard's numeric version comparison to work. This does **not** mean Android and Linux have identical enforcement capabilities.
+
+The app-usage/group protocol requires server **0.10.18**. If the server is still on 0.10.17, application usage will not be accepted even if the Android agent displays v0.10.18. If using the `latest` image in TrueNAS, **recreate/update the container** to run the new image: the tag by itself does not update a running container. The UI and server images are separate.
+
+The server exposes **`web_filter_available`**, not a separate `dns_active` field. Our agent refreshes this badge at VPN start/stop by reconnecting; an offline agent's last-known badge may be stale. See [Version and capability policy](docs/VERSION_POLICY.md).
+
+## Updates
+
+Install the next **higher-`versionCode`** APK signed by the **same maintainer certificate** over the existing installation. **Do not uninstall first:** removal deletes private pairing and usage state. The official v0.10.18 APK uses `applicationId fr.sevenskies.screenguard.agent` and `versionCode 21`. CI debug builds signed by a different key do not necessarily install as upgrades.
+
+- **[GitHub Releases](https://github.com/xavier-le7/screenguard-android-agent/releases):** normal Android installation, with APK and SHA-256 checksum.
+- **[GitHub Packages (GHCR)](https://github.com/xavier-le7/screenguard-android-agent/pkgs/container/screenguard-android-agent-apk):** a *non-runnable* OCI archive holding the same APK, for automated distribution; not an Android installer and not a Linux container.
+- Official APKs are built and signed by a trusted **tag-triggered** GitHub Actions workflow after tests. Community pull-request checks receive **no signing secrets**.
+
+See [Signing](docs/SIGNING.md) and [Release procedure](docs/RELEASING.md).
+
+## Build from source
+
+Prerequisites: JDK 17, Gradle 8.9, Android SDK API 35 and the SDK build-tools.
 
 ```bash
 gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
-A local debug APK is signed with a different certificate from maintainer releases. Android updates require the same package ID and signing certificate; see [Signing](docs/SIGNING.md). Release signing keys must never be exposed to pull requests.
+## Permissions, privacy and safety
 
-## Permissions and limitations
-
-| Permission or capability | Purpose |
+| Android capability | Used for |
 | --- | --- |
-| Usage Access | Locally measure active, unlocked screen time |
-| Accessibility (optional) | Apply app restrictions and recognize selected sensitive Settings pages |
-| Notifications | Display time-limit warnings and incoming parent messages |
-| Device Administrator (optional) | Add an OS deactivation step before uninstalling |
-| Internet | Communicate only with the configured ScreenGuard server |
+| Usage Access | Whole-screen and foreground-app time accounting |
+| `QUERY_ALL_PACKAGES` | Resolve foreground app labels/game categories; **not** upload a full installed-app inventory |
+| Accessibility (optional) | Present overlays for restricted apps and recognized sensitive Settings screens |
+| VPN consent (optional) | Route queries addressed to the synthetic DNS endpoint through an app-local DNS filter |
+| Foreground service, notifications | Long-running tracking/VPN and warnings/messages |
+| Device Administrator (optional, legacy) | Add an OS deactivation step before uninstall, **not** Device Owner-grade protection |
+| Internet | Communicate with the configured server and forward permitted DNS lookups |
 
-No root or Device Owner is required. **Anti-tampering is not guaranteed:** Accessibility can be revoked, services can be force-stopped and legacy Device Administrator can be deactivated. OEM Settings layouts vary. Offline totals cannot account for other devices until reconnection. Parent messages are not queued by the server for offline delivery.
+The server receives per-app names, categories and accumulated time when app reporting is enabled. Remote logs contain bounded health/counter data, not browsing contents, child names, credentials or raw Android logs. The optional VPN retains no history of queried domains. See [Privacy](docs/PRIVACY.md) and [Security limitations](docs/SECURITY.md).
 
-This project does not change the upstream server, database, wire protocol or Linux agents. It has not completed independent security testing or app-store policy review.
+No root or mandatory Device Owner is required. Users can still revoke permissions or force-stop the app; protections are not bypass-proof. Android's network settings, parental recovery and emergency functions must remain accessible.
 
-## Documentation
+## Documentation and contributing
 
-- [Protocol](docs/PROTOCOL.md)
-- [Setup and enforcement](docs/PHASE3.md)
-- [Security](docs/SECURITY.md)
-- [Privacy](docs/PRIVACY.md)
-- [Signing and CI](docs/SIGNING.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Public release checklist](docs/PUBLIC_RELEASE.md)
-- [Contributing](CONTRIBUTING.md)
+- [Setup, permissions and enforcement](docs/PHASE3.md)
+- [App accounting, groups and approvals](docs/ANDROID_APP_USAGE.md)
+- [Optional DNS-only VPN and its limitations](docs/ANDROID_DNS.md)
+- [Server-triggered logs and diagnostics](docs/ANDROID_REMOTE_LOGS.md)
+- [ScreenGuard 0.10.18 wire protocol](docs/PROTOCOL.md)
+- [Version policy and capability reporting](docs/VERSION_POLICY.md)
+- [Roadmap and known limitations](docs/ROADMAP.md)
+- [Privacy](docs/PRIVACY.md) · [Security](docs/SECURITY.md) · [Dependencies](docs/DEPENDENCIES.md)
+- [Contributing](CONTRIBUTING.md) · [Signing](docs/SIGNING.md) · [Releases](docs/RELEASING.md)
 
-## License and upstream collaboration
-
-The source code of this Android agent is available under the **GNU Affero General Public License v3.0 or later** (`AGPL-3.0-or-later`). See [LICENSE](LICENSE). You may study, modify and redistribute the code under that license, including in commercial projects, subject to its conditions. Any third-party components retain their own licenses; see [Dependencies and attribution](docs/DEPENDENCIES.md).
-
-This project is developed separately from [ScreenGuard](https://github.com/adambie/screenguard) and [ScreenGuard Mobile](https://github.com/adambie/screenguard-mobile), which also publish their software under the GNU AGPL family. Contributions, forks and improvements are encouraged, and the upstream maintainer is **welcome to incorporate this Android agent or parts of it** under the applicable AGPL terms. No affiliation or acceptance by the upstream projects is implied.
-
-## Project status and contributions
-
-This is the **public open-source source repository**. Its first code import was made from a reviewed source snapshot with a new, independent Git history; historical personal testing commits and internal build artifacts are not imported.
-
-**Contributions are welcome**, especially collaboration with the [original ScreenGuard project](https://github.com/adambie/screenguard). Please open an issue or pull request. This agent is independently developed and is not endorsed by upstream.
-
-## Maintainer builds
-
-Official APK releases use a stable maintainer signing certificate for in-place Android upgrades. The corresponding **private signing key must never be committed**, shared in a pull request or placed in any source archive. Public CI verifies contributions without requiring secrets; a separate trusted tag-triggered release job accesses signing secrets stored in GitHub Actions settings. See [Releasing](docs/RELEASING.md).
-
+This repository is **public open source under [GNU AGPL-3.0-or-later](LICENSE)**. Contributions, issues, forks and coordination with the [original ScreenGuard project](https://github.com/adambie/screenguard) are welcome; no upstream affiliation is implied. Signing keys, private device logs and personal data must not appear in issues, commits or pull requests.

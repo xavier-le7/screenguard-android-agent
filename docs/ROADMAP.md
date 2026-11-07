@@ -1,47 +1,38 @@
-# Development roadmap
+# ScreenGuard Android Agent — roadmap and current status
 
-This file describes the **current implementation and outstanding work** for ScreenGuard Android Agent. It is not a private device-test log. Version numbers are implementation milestones, not guarantees of independent certification.
+## Released in v0.10.18 (Android versionCode 21)
 
-## Implemented
+- [x] Public AGPL-3.0-or-later source, maintainer-signed Android APK and reproducible CI workflow.
+- [x] Encrypted WSS pairing with a user-supplied server URL and a single logical user (`local_uid 1000`).
+- [x] Android 14+ Usage Access accounting for interactive/unlocked screen time and locally persisted daily totals.
+- [x] Cumulative `usage_sync` and zero-additive heartbeat for shared quota accounting.
+- [x] Foreground per-app reporting and per-group cumulative usage using ScreenGuard 0.10.18 `app_usage_sync`.
+- [x] App group rules, weekday limits, adjustments, shared usage from other agents and Accessibility overlay restrictions.
+- [x] Persisted application approval requests (`app_request`) and parent decisions from `config_push`.
+- [x] Optional parent PIN, 60-second block test, 15-minute sensitive Settings authorization and legacy Device Administrator.
+- [x] Parent-to-child one-way notifications, when online.
+- [x] Server-initiated sanitized `fetch_logs` / `log_response` health and network/app counters.
+- [x] Notification for `update_agent` (links to official Android APK; no silent installer).
+- [x] Optional parent-enabled DNS-only `VpnService` applying `blocked_domains`.
+- [x] Separate parent-protected DNS ON and OFF controls; actual local activation display and server badge refresh.
+- [x] Best-effort recovery after network interruption, device boot and APK update if DNS was left enabled.
+- [x] Official v0.10.18 GitHub Release and GHCR archive containing its signed APK.
 
-- [x] Encrypted WSS pairing with the unmodified ScreenGuard server v0.10.17.
-- [x] Single logical Android agent user (`local_uid = 1000`) mapped to a chosen upstream profile.
-- [x] Android Usage Access accounting for unlocked interactive time, with persisted local daily totals.
-- [x] Cumulative `usage_sync` to reconcile shared quota without additive heartbeat double counting.
-- [x] Best-effort WebSocket reconnection, screen-wake recovery and boot/app-update recovery.
-- [x] Server-provided remaining-time decisions, warning thresholds, time windows and local app restriction overlay.
-- [x] Optional six-digit parent PIN, a 60-second restriction test and 15-minute sensitive-Settings authorization.
-- [x] Optional legacy Android Device Administrator and best-effort recognition of sensitive settings.
-- [x] Parent-to-child message notification using existing server `notify_user` fields.
-- [x] Adaptive launcher icon and six interface locales matching the upstream mobile parent client: French, English, Spanish, German, Portuguese and Polish.
-- [x] Maintainer-signed non-debuggable release APK and signing certificate verification in CI.
-- [x] Generic WSS server and child profile input for new installations, while retaining existing saved configuration.
-- [x] Isolated public pull-request test job with no access to maintainer signing secrets.
+## Work still needed
 
-## Compatibility and resilience still to validate
+- [ ] Bypass-resistant web filtering across DoH/DoT, browser-specific DNS, IPv6 DNS and conflicting VPNs; do not conflate today's DNS-only VPN with full content filtering.
+- [ ] Exhaustive multi-OEM testing of VPN start/stop, battery restrictions, reboot persistence, blocked-domain resolution and network failures.
+- [ ] Validate usage accuracy across long Doze, offline periods, reboot, clock changes, midnight and DST transitions.
+- [ ] Regression testing for app group daily limits, priority/exclusion rules, all-day block, other-device consumption and approval state changes.
+- [ ] Improve Android diagnostics and provide a reliable, timestamped server-side DNS status in cooperation with upstream (the present server has only `web_filter_available`).
+- [ ] Verify Android settings overlays/15-minute grace and parental recovery across additional vendors; Accessibility can be revoked.
+- [ ] Verify the update path from all previously signed builds, including user-data preservation and Accessibility reauthorization.
+- [ ] Move all newer inline UI strings to Android resources and complete/verify the six translations.
+- [ ] Review Accessibility disclosure, `QUERY_ALL_PACKAGES`, VPN permission and foreground service declarations for app-store policies.
+- [ ] Independent security/privacy assessment and exact dependency/third-party license audit.
 
-- [ ] Long offline periods, Android Doze, vendor-specific battery optimization, force-stop and restart.
-- [ ] Accuracy of reconstructed usage events around midnight, DST transitions and missing UsageStats events.
-- [ ] Android versions/manufacturers other than those already tested during development.
-- [ ] Permissions reactivation and accessible parental recovery after OS/service interruption.
-- [ ] Reliability of Android notifications across lock screen, Do Not Disturb and vendor settings.
-- [ ] Parent-message appearance while a foreground game is active and while the restriction overlay is shown.
-- [ ] Parent PIN grace-period expiry after 15 minutes and settings detection across OEM Settings screens.
-- [ ] Exceptions for calls, emergency functions, home-screen navigation and network configuration.
-- [ ] Exhaustive translations, accessibility, text scaling and internationalized date/time formatting.
+## Architecture and non-goals
 
-## Security and public release
+This is an **independent** Android companion, not a fork of ScreenGuard's Linux service. It uses upstream's existing v0.10.18 WebSocket messages; it does not patch the server or database. Android cannot terminate arbitrary packages or guarantee that a determined device user cannot disable Accessibility/VPN. Neither root nor mandatory Device Owner is required.
 
-- [ ] Complete review of private development history, branches, PRs, comments, artifacts and logs before sharing.
-- [x] Select and add GNU AGPL-3.0-or-later as the project license.
-- [ ] Complete third-party dependency attribution, provenance and license compatibility review.
-- [ ] Perform independent security and privacy assessment, including Android Accessibility and Device Administrator risks.
-- [ ] Validate installation and direct upgrade paths with a trusted, stable signing certificate.
-- [ ] Create a clean public source repository rather than exposing private development commits.
-- [ ] Review distribution/store policies independently; a signed APK is not automatically approved for Google Play.
-
-## Non-goals and architectural constraints
-
-The upstream ScreenGuard server, schema, authorization, existing quotas, Linux agent and WebSocket message contract are **out of scope**. This Android client cannot implement bidirectional messaging, a remote message queue or guaranteed Device Owner-grade tamper resistance without broader ecosystem changes.
-
-This roadmap must not contain child names, local addresses, infrastructure hostnames, tokens or screenshots of private devices.
+Keep all public documentation free of real child names, local/private URLs, identifiers and credentials. Contributions are welcome via [CONTRIBUTING.md](../CONTRIBUTING.md).
