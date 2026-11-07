@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.Context
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -41,10 +42,12 @@ class DnsVpnService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            setOptedIn(false)
             stopSelf()
             return START_NOT_STICKY
         }
         if (intent?.action != ACTION_START && intent != null) return START_NOT_STICKY
+        if (intent == null && !isOptedIn(this)) return START_NOT_STICKY
         if (prepare(this) != null) {
             stopSelf()
             return START_NOT_STICKY
@@ -77,6 +80,7 @@ class DnsVpnService : VpnService() {
             return
         }
         descriptor = vpn
+        setOptedIn(true)
         enabled = true
         isRunning = true
         Thread({ process(vpn) }, "ScreenGuardDnsTunnel").start()
@@ -138,6 +142,7 @@ class DnsVpnService : VpnService() {
     }
 
     override fun onRevoke() {
+        setOptedIn(false)
         enabled = false
         isRunning = false
         runCatching { descriptor?.close() }
@@ -156,7 +161,16 @@ class DnsVpnService : VpnService() {
     private fun vpnAddress(host: Int): String =
         intArrayOf(10, 44, 0, host).joinToString(".")
 
+    private fun setOptedIn(value: Boolean) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putBoolean("enabled", value).commit()
+    }
+
     companion object {
+        private const val PREFS = "screen_guard_dns_optin"
+        fun isOptedIn(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean("enabled", false)
         const val ACTION_START = "fr.sevenskies.screenguard.START_DNS_FILTER"
         const val ACTION_STOP = "fr.sevenskies.screenguard.STOP_DNS_FILTER"
         @Volatile var isRunning = false
