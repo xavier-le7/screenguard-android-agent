@@ -56,6 +56,21 @@ class AppGroupPolicyTest {
         assertFalse(AppGroupPolicy.decide(unrestricted, app, emptyMap(), emptyMap()).blocked)
     }
 
+    @Test fun builtInBlockedGroupForbidsAppsWithoutWeekdayLimits() {
+        val cfg = AppGroupPolicy.fromUserConfig(JSONObject("""
+        {"app_groups":[{
+          "id":"blocked-123","name":"Blocked","builtin":"blocked",
+          "rules":[{"kind":"app_id","value":"desktop:android.org.example.game"}],
+          "daily_limits":[],"adjustment_today":60
+        }]}
+        """.trimIndent()))
+        val app = AppGroupPolicy.App("desktop:android.org.example.game",
+            "Game", listOf("Game"))
+        val result = AppGroupPolicy.decide(cfg, app, emptyMap(), emptyMap())
+        assertTrue(result.blocked)
+        assertEquals("parent_denied", result.reason)
+    }
+
     @Test fun blockedDayOverridesPositiveAdjustment() {
         val config = AppGroupPolicy.Config(listOf(AppGroupPolicy.Group(
             "blocked", "Blocked", listOf(AppGroupPolicy.Rule("category", "Game", false)),
