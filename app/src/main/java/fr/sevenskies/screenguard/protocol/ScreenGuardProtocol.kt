@@ -36,17 +36,22 @@ object ScreenGuardProtocol {
                 .put("pairing_code", code)
         )
 
-    fun agentHello(machineId: String, hostname: String, timezone: String): String =
-        envelope(
+    fun agentHello(machineId: String, hostname: String, timezone: String, versionName: String,
+                   capabilities: List<String> = emptyList()): String {
+        require(versionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+"))) {
+            "Android app version must be a numeric ScreenGuard-compatible semver"
+        }
+        return envelope(
             "agent_hello",
             JSONObject()
                 .put("machine_id", machineId)
                 .put("hostname", hostname)
                 .put("timezone", timezone)
-                .put("agent_version", "android-0.5.3")
+                .put("agent_version", versionName)
                 .put("last_config_version", 0)
-                .put("capabilities", JSONArray())
+                .put("capabilities", JSONArray().apply { capabilities.forEach(::put) })
         )
+    }
 
     fun userListUpdate(child: String): String =
         envelope(
@@ -105,6 +110,43 @@ object ScreenGuardProtocol {
      * heartbeat delta. Server v0.10.17 stores MAX(old, snapshot) for each
      * agent_user_id/date; retransmission is therefore safe.
      */
+    data class AppUsage(
+        val date: String, val id: String, val name: String,
+        val categories: List<String>, val seconds: Long
+    )
+    data class GroupUsage(val date: String, val id: String, val seconds: Long)
+
+    fun appUsageSync(apps: List<AppUsage>, groups: List<GroupUsage>): String {
+        val entries = JSONArray()
+        for (app in apps) {
+            require(app.seconds >= 0 && app.id.length in 1..255)
+            java.time.LocalDate.parse(app.date)
+            entries.put(JSONObject()
+                .put("local_uid", LOCAL_UID).put("date", app.date)
+                .put("app_id", app.id).put("display_name", app.name.take(128))
+                .put("categories", JSONArray().apply { app.categories.forEach(::put) })
+                .put("seconds_total", app.seconds))
+        }
+        val groupEntries = JSONArray()
+        for (group in groups) {
+            require(group.seconds >= 0 && group.id.isNotBlank())
+            java.time.LocalDate.parse(group.date)
+            groupEntries.put(JSONObject().put("local_uid", LOCAL_UID)
+                .put("date", group.date).put("group_id", group.id)
+                .put("seconds_total", group.seconds))
+        }
+        return envelope("app_usage_sync", JSONObject()
+            .put("entries", entries).put("groups", groupEntries))
+    }
+
+    fun appRequest(id: String, name: String, categories: List<String>): String {
+        require(id.length in 1..255 && name.isNotBlank())
+        return envelope("app_request", JSONObject()
+            .put("local_uid", LOCAL_UID).put("app_id", id)
+            .put("display_name", name.take(128))
+            .put("categories", JSONArray().apply { categories.forEach(::put) }))
+    }
+
     fun usageSync(dailySeconds: Map<String, Long>): String {
         val records = JSONArray()
         for ((date, seconds) in dailySeconds.toSortedMap()) {
