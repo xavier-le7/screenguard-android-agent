@@ -1,28 +1,36 @@
-# Security and limitations
+# Security model and limitations — Android v0.10.18
 
-## Trust model
+## Trust boundaries
 
-ScreenGuard Android Agent connects only to the ScreenGuard server explicitly configured by its administrator. The pairing token is encrypted locally with Android Keystore AES-GCM; Android application backups are disabled. The connection requires WSS with standard TLS certificate verification.
+- The app connects to **the server specified by the parent**, using WSS and normal TLS verification. The bearer token is encrypted at rest using Android Keystore AES-GCM; backups are disabled.
+- The self-hosted ScreenGuard server controls quotas, policy and records. The Android app uses upstream v0.10.18 wire messages and does not patch the backend.
+- Parent PIN gates app-specific administrative actions and optionally recognized sensitive Settings screens. It is **not** an Android system credential, Device Owner policy or unbreakable anti-tamper control.
+- Android Usage Access and Accessibility are necessary for accurate accounting and local overlays. They can be revoked, force-stopped or restricted by the user/OEM.
+- Legacy Device Administrator adds an Android deactivation step before uninstalling; it can be deactivated and is **not** Device Owner.
 
-This client never changes upstream ScreenGuard server behavior. The configured server controls quotas, schedules, profile associations and server-side retention.
+## App controls and remote commands
 
-## Threat model
+An Accessibility overlay is used to prevent use of apps that exceed group limits or require approval. Android cannot forcibly terminate arbitrary processes. System and emergency recovery must remain accessible. Per-device/group time can be stale while offline; other agents' usage is incorporated only after receiving the server update.
 
-- The app's six-digit parent PIN protects actions **inside the app**, with a temporary 15-minute authorization for selected Settings pages.
-- The Accessibility service is best-effort and may be disabled or stopped by Android. Manufacturer Settings screens can change without notice.
-- Legacy Device Administrator is **not** Device Owner: it can be deactivated through Android. Its warning is not an enforceable PIN challenge.
-- Root, Safe Mode and physical device control can circumvent these restrictions.
-- Usage collected while offline may temporarily exceed the shared quota because activity of other agents is unknown.
-- Parent notifications require an online agent; messages are one-way and are not queued for offline delivery.
+Remote `fetch_logs` returns only short, bounded, application-owned diagnostics (no system logcat or secrets). Remote `update_agent` prompts the parent to open the signed Android Releases page; **it never executes a Linux installer or silently installs an APK**. Do not add arbitrary filesystem/network/command execution to the remote-control surface.
 
-Do not market this client as tamper-proof or suitable for high-assurance enforcement. Network access, essential applications, system recovery and emergency access must remain available.
+## DNS VPN risks
 
-## Responsible disclosure
+DNS filtering is **optional and experimental**. It requires Android VPN consent plus the ScreenGuard parent PIN. The service inspects DNS queries destined for its synthetic VPN DNS endpoint and forwards allowed queries via protected UDP to an underlying network resolver.
 
-Report possible vulnerabilities privately to the repository maintainer, using GitHub private vulnerability reporting where available. Do not post pairing tokens, signing credentials, private hostnames, child information, or unredacted logs in issues or pull requests. No formal response time is promised.
+- **Not bypass-resistant:** DoH/DoT, Android Private DNS, IPv6 DNS, browser-specific resolvers, caches and competing VPNs can avoid this DNS-only filter.
+- **Availability risk:** if the physical network's resolver is unavailable, permitted lookups can fail (SERVFAIL), affecting connectivity. A parent must be able to stop the VPN.
+- **State/reporting:** local ACTIVE/STOPPING/PENDING/DISABLED flags and `fetch_logs` counters are diagnostics, not independently attested state. The server's `web_filter_available` badge is derived from `agent_hello`, can be stale offline and does **not** certify coverage.
+- **Persistence:** after a parent explicitly turns DNS OFF, the opt-in preference should persist through reboot/upgrade. If left ON and still authorized, Android attempts best-effort restart; OEM background limits may prevent it.
 
-## Source-publication checklist
+Do not call the app tamper-proof or market it as a guaranteed filtering solution. Do not rely on it for emergency services, high-assurance network restrictions or prevention of all bypass routes.
 
-Inspect all branches, commits, PR comments, issues, logs and workflow artifacts for personal data before publishing. Cleaning the latest source files **does not remove historical commits**. Prefer a new repository from a clean reviewed snapshot rather than making an existing private development repository public.
+## Public contributions and release signing
 
-Signing keys and passwords must remain outside Git. Forks and untrusted pull requests must not receive maintainer signing secrets. Review dependency licensing, Android sensitive permissions, Accessibility disclosures and store rules before wider distribution.
+Only reviewed tag-triggered CI jobs can use the existing maintainer signing secrets. Public pull-request jobs should have **no signing secrets**; forks must generate their own key/package identity. Protect `main` and `v*` tags with repository rulesets and restrict who can edit workflows or secrets.
+
+Never publish private hostnames, pairing tokens, signing keys, children’s information, raw logs or real device screenshots in issues, PRs or diagnostics.
+
+## Security reports
+
+Use GitHub's private vulnerability reporting feature if enabled, or contact the repository maintainer privately. Do not submit exploit details containing credentials or private data to a public issue. No guaranteed response time or formal security certification is offered.

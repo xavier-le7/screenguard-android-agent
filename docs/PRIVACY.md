@@ -1,23 +1,33 @@
-# Privacy and data handling
+# Privacy and data handling — Android v0.10.18
 
-ScreenGuard Android Agent is a client for a self-hosted parental-control server. It does not operate a separate cloud backend or include third-party analytics.
+ScreenGuard Android Agent is an independent client for a self-hosted parental-control server. It has **no separate cloud service or embedded third-party analytics**. Communication goes to the parent-configured ScreenGuard server (plus DNS forwarding to an underlying-network resolver if the optional VPN is enabled).
 
-## On-device information
+## Data on the device
 
-The agent uses an app-scoped generated identifier, a user-entered child profile name, pairing credentials, locally aggregated daily usage, recent quota decisions and diagnostic state. Parent messages are received over the existing server connection and displayed as notifications.
+App-private storage includes:
+- Generated agent identity, parent-supplied profile display name and an encrypted bearer token.
+- Whole-device daily time, foreground-app and application-group daily cumulative time.
+- Cached policies/approvals, other-device group usage, notification/health state and diagnostic event counts.
+- Parent's optional DNS opt-in preference and **aggregate** DNS counters.
 
-With explicit Usage Access, the app reads screen interaction and keyguard events to calculate interactive, unlocked screen time. Optional Accessibility detects foreground applications and selected Android Settings titles to enforce restrictions. This is not designed to record screen images, microphone content or camera content.
+The bearer token uses Android Keystore-backed AES-GCM encryption. Android application backups are disabled; uninstalling usually deletes private data, including pairing. Android permissions (Usage Access, Accessibility, notifications, VPN, optional legacy Device Administrator) can be reviewed or revoked using Android Settings.
 
-## Network and server
+## Data sent to ScreenGuard server
 
-The client sends its agent identity, logical user and cumulative usage totals only to the secure ScreenGuard WebSocket endpoint configured during pairing. That independently administered server controls retention, access and deletion of server records.
+Over the configured WSS connection, the agent sends its identity, paired local user and whole-device cumulative screen time. **In v0.10.18 it also sends per-application information** — Android package-based `app_id`, display name, categories and accumulated foreground seconds — plus cumulative app-group seconds. New-app approval requests can also include app identity/name/category.
 
-Parent messages are delivered only to connected agents. The Android app has no separate messaging server and does not send replies.
+The server processes and retains these values according to its own configuration, rules and access controls; this Android project does not administer server-side retention. Parent messages are delivered to an online agent as Android notifications and are not sent back as replies.
 
-## Storage and user controls
+When requested by the server, remote diagnostics transmit **bounded app-owned health, fixed-vocabulary events and aggregate counters**; they do not send raw logcat, URLs, typed text, child names, credentials, package names or parent-message text.
 
-The bearer token is encrypted with Android Keystore AES-GCM and application backups are disabled. Usage counters and policies are kept in app-private storage. Android permission controls let an administrator revoke notifications, Usage Access, Accessibility and Device Administrator; relevant app functions may then stop.
+## Optional DNS filtering
 
-Uninstalling typically removes app-private local data. Server-side records must be managed through the self-hosted ScreenGuard administration interface.
+If the parent explicitly enables the DNS VPN, the device examines requested **domain names locally** to match the server's `blocked_domains` policy. Permitted DNS requests are forwarded to a DNS resolver obtained from the underlying network; they therefore leave the device as network DNS queries. The Android app does **not** retain or transmit a DNS browsing/query history to ScreenGuard.
 
-This notice describes the client only, not the privacy practices of independent server operators or distribution platforms. Independent review is recommended before a wide deployment.
+DNS filtering is **not** complete browsing privacy or bypass resistance: encrypted DNS, some IPv6 traffic, alternate VPNs and browser-specific resolvers can avoid it. The server receives an online availability badge via `web_filter_available`, not detailed domain records.
+
+## User controls and caveats
+
+The parent can enable/disable the optional VPN using a parent PIN; stopping it persists across reboot. Device/Android permission controls remain available and may override the app. Screen-time reports can be incomplete after permission removal or long offline periods.
+
+This privacy description covers the Android **client**. The independently operated ScreenGuard server, device OEM, app distribution platform and network resolver have their own privacy/security properties. A source code repository or successful CI build is not a substitute for an independent privacy review.
