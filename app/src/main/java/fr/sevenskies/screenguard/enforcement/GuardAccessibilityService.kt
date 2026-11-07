@@ -25,6 +25,7 @@ import android.widget.EditText
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import fr.sevenskies.screenguard.i18n.ScreenGuardI18n
 import fr.sevenskies.screenguard.storage.AgentStore
 import fr.sevenskies.screenguard.storage.AppPolicyStore
@@ -240,6 +241,11 @@ class GuardAccessibilityService : AccessibilityService() {
         if (appDenied && appBlockPackage != pkg) {
             appBlockPackage = pkg
             appBlockStartedAt = now
+            if (appPolicy?.reason == "group_limit") {
+                Toast.makeText(this,
+                    loc("Quota de cette application épuisé : blocage dans 10 secondes."),
+                    Toast.LENGTH_LONG).show()
+            }
         } else if (!appDenied) {
             appBlockPackage = null
             appBlockStartedAt = 0L
