@@ -1,0 +1,150 @@
+name: Signed Android development candidate
+
+# Only trusted direct commits to the owner's dev branch can use release secrets.
+# Never enable this workflow on pull_request or pull_request_target.
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenguard-signed-dev-candidate
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: github.repository == 'xavier-le7/screenguard-android-agent' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout development branch
+        uses: actions/checkout@v4
+      - name: Source privacy preflight
+        run: python3 scripts/check-public-snapshot.py
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android API 35
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Restore official signing certificate
+        env:
+          SIGNING_KEYSTORE_B64: ${{ secrets.SG_ANDROID_KEYSTORE_B64 }}
+          SIGNING_PASSWORD: ${{ secrets.SG_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SIGNING_KEYSTORE_B64" ] || [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::error::Stable signing secrets not configured."
+            exit 1
+          fi
+          umask 077
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          raw = "".join(os.environ["SIGNING_KEYSTORE_B64"].split())
+          binary = base64.b64decode(raw, validate=True)
+          if len(binary) < 100:
+              raise SystemExit("Invalid keystore length")
+          path = Path(os.environ["RUNNER_TEMP"]) / "screenguard-agent.p12"
+          path.write_bytes(binary)
+          path.chmod(0o600)
+          PY
+          keytool -list -keystore "$RUNNER_TEMP/screenguard-agent.p12" \
+            -storetype PKCS12 -storepass:env SIGNING_PASSWORD -alias screenguard-agent > /dev/null
+      - name: Run tests and build signed candidate
+        env:
+          SG_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/screenguard-agent.p12
+          SG_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SG_ANDROID_KEYSTORE_PASSWORD }}
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleRelease
+      - name: Verify candidate against actual installed stable signing certificate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/candidate-signing.txt"
+          test "$(grep -c 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/candidate-signing.txt")" -ge 1
+          PACKAGE="$("$AAPT" dump badging "$APK" | grep '^package:' | head -n 1)"
+          case "$PACKAGE" in
+            *"name='fr.sevenskies.screenguard.agent'"*"versionCode='22'"*"versionName='0.10.20'"*) ;;
+            *) echo "::error::Incorrect app ID, versionCode, or versionName: $PACKAGE"; exit 1 ;;
+          esac
+          if "$AAPT" dump badging "$APK" | grep -q '^application-debuggable'; then
+            echo "::error::Candidate APK must not be debuggable."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/stable"
+          gh release download v0.10.18 --pattern '*.apk' --dir "$RUNNER_TEMP/stable"
+          STABLE="$(find "$RUNNER_TEMP/stable" -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -s "$STABLE"
+          "$APKSIGNER" verify --verbose --print-certs "$STABLE" > "$RUNNER_TEMP/stable-signing.txt"
+          DIGEST() {
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$1" | head -n 1
+          }
+          STABLE_CERT="$(DIGEST "$RUNNER_TEMP/stable-signing.txt")"
+          CANDIDATE_CERT="$(DIGEST "$RUNNER_TEMP/candidate-signing.txt")"
+          if [ -z "$STABLE_CERT" ] || [ "$STABLE_CERT" != "$CANDIDATE_CERT" ]; then
+            echo "::error::Candidate not signed with the stable certificate."
+            exit 1
+          fi
+          echo "Verified: same signing cert as published stable APK, same package, versionCode 22 > 21, non-debuggable."
+      - name: Package installable APK and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p candidate
+          NAME="screenguard-android-agent-v0.10.20-rc1.apk"
+          cp app/build/outputs/apk/release/app-release.apk "candidate/$NAME"
+          (cd candidate && sha256sum "$NAME" > "$NAME.sha256")
+      - name: Archive signed installable candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenguard-android-agent-v0.10.20-rc1-signed
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish isolated prerelease (not stable)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="android-v0.10.20-rc1"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Candidate release already exists; never overwrite a previously signed release."
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/candidate-notes.md" <<'NOTES'
+          ## Android 0.10.20 release candidate 1 — TEST ONLY
+
+          Signed by the same maintainer certificate as stable v0.10.18 (verified against the published stable APK).
+          Android package: `fr.sevenskies.screenguard.agent`, versionCode 22, non-debuggable.
+          Installs over v0.10.18 without uninstalling; Android pairing and local history are preserved.
+
+          This release is **pre-release**, not a tested stable version. Its overlay-driven usage exclusion needs physical-device validation. Download the APK asset, not the source-code archive.
+          See `docs/releases/v0.10.20.md` on the dev branch for the full test protocol.
+          NOTES
+          gh release create "$TAG" candidate/*.apk candidate/*.apk.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "ScreenGuard Android v0.10.20-rc1 (signed test APK)" \
+            --notes-file "$RUNNER_TEMP/candidate-notes.md" \
+            --prerelease
+          gh release view "$TAG" --json url,assets,isPrerelease
