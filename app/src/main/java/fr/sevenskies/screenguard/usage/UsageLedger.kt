@@ -58,6 +58,7 @@ class UsageLedger(private val context: Context) {
         // Returns null when Android does not yet expose the usage history.
         val events = usageStats.queryEvents(previous, now) ?: return@synchronized false
         val totals = readTotals()
+        val blocked = OverlayUsageGate.snapshot(context, now)
         var cursor = previous
         var interactive = prefs.getBoolean("interactive", false)
         var unlocked = prefs.getBoolean("unlocked", false)
@@ -66,7 +67,9 @@ class UsageLedger(private val context: Context) {
             events.getNextEvent(event)
             val at = event.timeStamp.coerceIn(cursor, now)
             if (interactive && unlocked) {
-                UsageAccounting.addActiveInterval(totals, cursor, at, zone)
+                UsageExclusions.forEachAllowed(cursor, at, blocked) { from, to ->
+                    UsageAccounting.addActiveInterval(totals, from, to, zone)
+                }
             }
             cursor = at
             when (event.eventType) {
@@ -77,7 +80,9 @@ class UsageLedger(private val context: Context) {
             }
         }
         if (interactive && unlocked) {
-            UsageAccounting.addActiveInterval(totals, cursor, now, zone)
+            UsageExclusions.forEachAllowed(cursor, now, blocked) { from, to ->
+                UsageAccounting.addActiveInterval(totals, from, to, zone)
+            }
         }
         // Hardware is authoritative for the NEXT interval if vendor event
         // reporting is incomplete; never rewrite historical time retroactively.
