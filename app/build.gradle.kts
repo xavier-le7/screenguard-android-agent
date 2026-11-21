@@ -19,8 +19,8 @@ android {
         applicationId = "fr.sevenskies.screenguard.agent"
         minSdk = 34
         targetSdk = 35
-        versionCode = 21
-        versionName = "0.10.18"
+        versionCode = 22
+        versionName = "0.10.20"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

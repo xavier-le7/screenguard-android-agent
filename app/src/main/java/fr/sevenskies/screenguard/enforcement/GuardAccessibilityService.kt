@@ -35,6 +35,7 @@ import fr.sevenskies.screenguard.security.ParentPin
 import fr.sevenskies.screenguard.tracking.AgentDiagnostics
 import fr.sevenskies.screenguard.tracking.ProtectionHealthReporter
 import fr.sevenskies.screenguard.usage.UsageLedger
+import fr.sevenskies.screenguard.usage.OverlayUsageGate
 
 /**
  * Blocks nonessential foreground applications via TYPE_ACCESSIBILITY_OVERLAY.
@@ -66,6 +67,10 @@ class GuardAccessibilityService : AccessibilityService() {
     private val poll = object : Runnable {
         override fun run() {
             reevaluate()
+            if (overlayKind == "quota" || overlayKind == "app") {
+                if (overlay?.isAttachedToWindow == true) OverlayUsageGate.confirm(this@GuardAccessibilityService)
+                else OverlayUsageGate.end(this@GuardAccessibilityService)
+            }
             handler.postDelayed(this, 1_000L)
         }
     }
@@ -513,6 +518,7 @@ class GuardAccessibilityService : AccessibilityService() {
             windows.addView(content, params)
             overlay = content
             overlayKind = "app"
+            OverlayUsageGate.begin(this)
         }.onFailure {
             Log.e("ScreenGuardGuard", "App overlay unavailable", it)
         }
@@ -565,6 +571,7 @@ class GuardAccessibilityService : AccessibilityService() {
             windows.addView(content, params)
             overlay = content
             overlayKind = "quota"
+            OverlayUsageGate.begin(this)
         }.onFailure {
             val reason = "Impossible d'afficher le blocage : " + it.javaClass.simpleName
             state.message = reason
@@ -575,9 +582,11 @@ class GuardAccessibilityService : AccessibilityService() {
 
     private fun hideOverlay() {
         val view = overlay ?: return
+        val wasUsageBlock = overlayKind == "quota" || overlayKind == "app"
         overlay = null
         overlayKind = null
         runCatching { windows.removeView(view) }
+        if (wasUsageBlock) OverlayUsageGate.end(this)
     }
 
     override fun onInterrupt() { hideOverlay() }

@@ -62,6 +62,7 @@ class AppUsageLedger(private val context: Context) {
             apps.keys.removeAll { it.startsWith(datePrefix) }
             groups.keys.removeAll { it.startsWith(datePrefix) }
         }
+        val blocked = OverlayUsageGate.snapshot(context, now)
         var foreground = if (bootstrap) null else prefs.getString("foreground", null)
         var interactive = if (bootstrap) false else prefs.getBoolean("interactive", false)
         var unlocked = if (bootstrap) false else prefs.getBoolean("unlocked", false)
@@ -74,9 +75,12 @@ class AppUsageLedger(private val context: Context) {
             if (until > cursor && interactive && unlocked && pkg != null && eligible(pkg)) {
                 val id = AppGroupPolicy.appId(pkg)
                 if (id != null) {
-                    addInterval(apps, id, cursor, until)
                     val app = info(pkg)
-                    AppGroupPolicy.assign(config, app)?.let { addInterval(groups, it.id, cursor, until) }
+                    val group = AppGroupPolicy.assign(config, app)
+                    UsageExclusions.forEachAllowed(cursor, until, blocked) { from, to ->
+                        addInterval(apps, id, from, to)
+                        group?.let { addInterval(groups, it.id, from, to) }
+                    }
                 }
             }
             cursor = until
